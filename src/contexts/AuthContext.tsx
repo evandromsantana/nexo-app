@@ -1,92 +1,72 @@
+// src/contexts/AuthContext.tsx
+
 import React, {
   createContext,
+  useContext,
   useState,
-  useEffect,
   ReactNode,
-  useCallback,
+  useEffect,
 } from "react";
-import { getAuth, onAuthStateChanged, User } from "firebase/auth";
-import { getUserProfile } from "../api/firestore";
-import { UserProfile } from "../types";
+import { onAuthStateChanged, User } from "firebase/auth";
+import { auth } from "../api/firebaseConfig";
 
-// Interface do Contexto aprimorada
+import { getUserProfile } from "../api/firestore"; // A FUNÇÃO vem da API
+import { UserProfile } from "../types"; // O TIPO vem do novo arquivo
+
+// 1. Adicione a função à interface
 export interface AuthContextType {
   user: User | null;
   userProfile: UserProfile | null;
-  loading: boolean; // Para o carregamento inicial
-  isRefetching: boolean; // NOVO: Para atualizações
-  error: Error | null; // NOVO: Para tratar erros
-  refetchUserProfile: () => void;
+  loading: boolean;
+  refetchUserProfile: () => Promise<void>;
 }
 
-export const AuthContext = createContext<AuthContextType>({
-  user: null,
-  userProfile: null,
-  loading: true,
-  isRefetching: false,
-  error: null,
-  refetchUserProfile: () => {},
-});
+export const AuthContext = createContext<AuthContextType | undefined>(
+  undefined
+);
 
-interface AuthProviderProps {
-  children: ReactNode;
-}
-
-export const AuthProvider = ({ children }: AuthProviderProps) => {
+export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [isRefetching, setIsRefetching] = useState<boolean>(false); // NOVO
-  const [error, setError] = useState<Error | null>(null); // NOVO
-
-  const fetchUserProfile = useCallback(async (firebaseUser: User | null) => {
-    if (firebaseUser) {
-      try {
-        setError(null); // Limpa erros anteriores
-        const profile = await getUserProfile(firebaseUser.uid);
-        setUserProfile(profile);
-      } catch (err) {
-        console.error("Error fetching user profile in AuthContext:", err);
-        setUserProfile(null);
-        setError(
-          err instanceof Error ? err : new Error("Ocorreu um erro desconhecido")
-        ); // Define o erro
-      }
-    } else {
-      setUserProfile(null);
-    }
-    // O loading inicial só é finalizado após a primeira tentativa de busca
-    setLoading(false);
-  }, []);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const auth = getAuth();
-    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
-      setUser(firebaseUser);
-      fetchUserProfile(firebaseUser);
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+      setUser(currentUser);
+      if (currentUser) {
+        const profile = await getUserProfile(currentUser.uid);
+        setUserProfile(profile as UserProfile | null);
+      } else {
+        setUserProfile(null);
+      }
+      setLoading(false);
     });
-    return unsubscribe;
-  }, [fetchUserProfile]);
+    return () => unsubscribe();
+  }, []);
 
-  const refetchUserProfile = useCallback(async () => {
+  // 2. Implemente a função
+  const refetchUserProfile = async () => {
     if (user) {
-      setIsRefetching(true); // Inicia o indicador de refetch
-      await fetchUserProfile(user);
-      setIsRefetching(false); // Finaliza o indicador
+      // Força uma nova busca do perfil no Firestore
+      const profile = await getUserProfile(user.uid);
+      setUserProfile(profile as UserProfile | null);
     }
-  }, [user, fetchUserProfile]);
+  };
+
+  // 3. Forneça a função no valor do contexto
+  const value = { user, userProfile, loading, refetchUserProfile };
 
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        userProfile,
-        loading,
-        isRefetching,
-        error,
-        refetchUserProfile,
-      }}>
-      {children}
+    <AuthContext.Provider value={value}>
+      {!loading && children}
     </AuthContext.Provider>
   );
+};
+
+export const useAuth = (): AuthContextType => {
+  const context = useContext(AuthContext);
+  if (context === undefined) {
+    throw new Error("useAuth deve ser usado dentro de um AuthProvider");
+  }
+  return context;
 };

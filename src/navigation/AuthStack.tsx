@@ -1,9 +1,9 @@
-import React from 'react';
-import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import React from "react";
+import { createNativeStackNavigator } from "@react-navigation/native-stack";
 
-import LoginScreen from '../screens/LoginScreen/index.tsx';
-import RegisterScreen from '../screens/RegisterScreen/index.tsx';
-import { RootStackParamList } from '../types';
+import LoginScreen from "../screens/LoginScreen";
+import RegisterScreen from "../screens/RegisterScreen";
+import { RootStackParamList } from "../types";
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 

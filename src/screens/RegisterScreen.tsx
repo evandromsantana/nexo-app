@@ -1,23 +1,34 @@
 import React, { useState } from "react";
 import { View, Text, TextInput, Alert, StyleSheet } from "react-native";
-import { login } from "../../api/auth.ts";
+import { register } from "../api/auth.ts";
+import { createUserProfile } from "../api/firestore.ts";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
-import { COLORS, FONT_SIZES } from "../../constants";
-import AppButton from "../../components/common/AppButton.tsx";
-import { RootStackParamList } from "../../types";
+import { COLORS, FONT_SIZES } from "../constants";
+import AppButton from "../components/common/AppButton.tsx";
+import { RootStackParamList } from "../types";
 import { FirebaseError } from "firebase/app"; // Import FirebaseError
-import { getFirebaseErrorMessage } from "../../utils/errorUtils";
+import { getFirebaseErrorMessage } from "../utils/errorUtils";
 
-type LoginScreenProps = NativeStackScreenProps<RootStackParamList, "Login">;
+import Toast from "react-native-toast-message";
 
-const LoginScreen = ({ navigation }: LoginScreenProps) => {
+type RegisterScreenProps = NativeStackScreenProps<
+  RootStackParamList,
+  "Register"
+>;
+
+const RegisterScreen = ({ navigation }: RegisterScreenProps) => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [errors, setErrors] = useState({ email: "", password: "" });
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [errors, setErrors] = useState({
+    email: "",
+    password: "",
+    confirmPassword: "",
+  });
   const [loading, setLoading] = useState(false);
 
   const validateFields = () => {
-    const newErrors = { email: "", password: "" };
+    const newErrors = { email: "", password: "", confirmPassword: "" };
     let isValid = true;
 
     if (!email) {
@@ -27,23 +38,42 @@ const LoginScreen = ({ navigation }: LoginScreenProps) => {
     if (!password) {
       newErrors.password = "O campo Senha é obrigatório.";
       isValid = false;
+    } else if (password.length < 6) {
+      newErrors.password = "A senha deve ter no mínimo 6 caracteres.";
+      isValid = false;
+    }
+    if (password !== confirmPassword) {
+      newErrors.confirmPassword = "As senhas não coincidem.";
+      isValid = false;
     }
 
     setErrors(newErrors);
     return isValid;
   };
 
-  const handleLogin = async () => {
+  const handleRegister = async () => {
     if (!validateFields()) {
       return;
     }
     setLoading(true);
     try {
-      await login(email, password);
-      // The onAuthStateChanged in AuthContext will handle the navigation
+      const userCredential = await register(email, password);
+      const { user } = userCredential;
+      const lowercasedEmail = user.email ? user.email.toLowerCase() : "";
+      // Create user profile in Firestore
+      await createUserProfile(user.uid, {
+        email: lowercasedEmail,
+        timeBalance: 0,
+      }); // Initial time balance
+      Toast.show({
+        type: "success",
+        text1: "Sucesso!",
+        text2: "Cadastro realizado com sucesso!",
+      });
+      navigation.replace("Onboarding"); // Navigate to onboarding after successful registration
     } catch (error: unknown) {
       const errorMessage = getFirebaseErrorMessage(error);
-      Alert.alert("Erro de Login", errorMessage);
+      Alert.alert("Erro de Cadastro", errorMessage);
     } finally {
       setLoading(false);
     }
@@ -51,7 +81,7 @@ const LoginScreen = ({ navigation }: LoginScreenProps) => {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Login</Text>
+      <Text style={styles.title}>Cadastro</Text>
 
       <TextInput
         style={styles.input}
@@ -82,16 +112,31 @@ const LoginScreen = ({ navigation }: LoginScreenProps) => {
         <Text style={styles.errorText}>{errors.password}</Text>
       ) : null}
 
+      <TextInput
+        style={styles.input}
+        placeholder="Confirmar Senha"
+        value={confirmPassword}
+        onChangeText={(text) => {
+          setConfirmPassword(text);
+          if (errors.confirmPassword)
+            setErrors({ ...errors, confirmPassword: "" });
+        }}
+        secureTextEntry
+      />
+      {errors.confirmPassword ? (
+        <Text style={styles.errorText}>{errors.confirmPassword}</Text>
+      ) : null}
+
       <AppButton
-        title="Login"
-        onPress={handleLogin}
+        title="Cadastrar"
+        onPress={handleRegister}
         loading={loading}
         variant="primary"
       />
 
       <AppButton
-        title="Não tem uma conta? Cadastre-se"n
-        onPress={() => navigation.navigate("Register")}
+        title="Já tem uma conta? Faça Login"
+        onPress={() => navigation.goBack()}
         variant="ghost"
       />
     </View>
@@ -130,4 +175,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default LoginScreen;
+export default RegisterScreen;

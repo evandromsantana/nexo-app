@@ -1,23 +1,35 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, Alert, StyleSheet, ActivityIndicator, FlatList, TouchableOpacity } from 'react-native';
-import { useAuth } from '../../hooks/useAuth';
-import { getUserProfile, updateUserProfile } from '../../api/firestore';
-import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { COLORS, FONT_SIZES } from '../../constants';
-import AppButton from '../../components/common/AppButton';
-import { RootStackParamList, UserProfile } from '../../types';
-import { getFirebaseErrorMessage } from "../../utils/errorUtils";
+import React, { useState, useEffect } from "react";
+import {
+  View,
+  Text,
+  TextInput,
+  Alert,
+  StyleSheet,
+  ActivityIndicator,
+  FlatList,
+  TouchableOpacity,
+} from "react-native";
+import { useAuth } from "../contexts/AuthContext";
+import { getUserProfile, updateUserProfile } from "../api/firestore";
+import { NativeStackScreenProps } from "@react-navigation/native-stack";
+import { COLORS, FONT_SIZES } from "../constants";
+import AppButton from "../components/common/AppButton";
+import { RootStackParamList, UserProfile } from "../types";
+import { getFirebaseErrorMessage } from "../utils/errorUtils";
 
-type OnboardingScreenProps = NativeStackScreenProps<RootStackParamList, 'Onboarding'>;
+type OnboardingScreenProps = NativeStackScreenProps<
+  RootStackParamList,
+  "Onboarding"
+>;
 
 const OnboardingScreen = ({ navigation }: OnboardingScreenProps) => {
   const { user, refetchUserProfile } = useAuth();
   const [profileData, setProfileData] = useState<Partial<OnboardingProfile>>({
-    name: '',
-    bio: '',
+    name: "",
+    bio: "",
     skills: [],
   });
-  const [newSkill, setNewSkill] = useState('');
+  const [newSkill, setNewSkill] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -33,8 +45,8 @@ const OnboardingScreen = ({ navigation }: OnboardingScreenProps) => {
         const currentProfile = await getUserProfile(user.uid);
         if (currentProfile) {
           setProfileData({
-            name: currentProfile.name || '',
-            bio: currentProfile.bio || '',
+            name: currentProfile.name || "",
+            bio: currentProfile.bio || "",
             skills: currentProfile.skills || [],
           });
         }
@@ -49,10 +61,14 @@ const OnboardingScreen = ({ navigation }: OnboardingScreenProps) => {
 
   const handleAddSkill = () => {
     const trimmedSkill = newSkill.trim().toLowerCase();
-    if (trimmedSkill && profileData.skills && !profileData.skills.includes(trimmedSkill)) {
+    if (
+      trimmedSkill &&
+      profileData.skills &&
+      !profileData.skills.includes(trimmedSkill)
+    ) {
       const updatedSkills = [...profileData.skills, trimmedSkill];
       setProfileData({ ...profileData, skills: updatedSkills });
-      setNewSkill('');
+      setNewSkill("");
     } else if (!trimmedSkill) {
       Alert.alert("Erro", "Por favor, digite uma habilidade.");
     } else if (profileData.skills?.includes(trimmedSkill)) {
@@ -62,14 +78,19 @@ const OnboardingScreen = ({ navigation }: OnboardingScreenProps) => {
 
   const handleRemoveSkill = (skillToRemove: string) => {
     if (profileData.skills) {
-      const updatedSkills = profileData.skills.filter(skill => skill !== skillToRemove);
+      const updatedSkills = profileData.skills.filter(
+        (skill) => skill !== skillToRemove
+      );
       setProfileData({ ...profileData, skills: updatedSkills });
     }
   };
 
   const handleSaveProfile = async () => {
     if (!user || !profileData.name || profileData.skills?.length === 0) {
-      Alert.alert("Erro", "Por favor, preencha seu nome e adicione pelo menos uma habilidade.");
+      Alert.alert(
+        "Erro",
+        "Por favor, preencha seu nome e adicione pelo menos uma habilidade."
+      );
       return;
     }
     setSaving(true);
@@ -87,7 +108,10 @@ const OnboardingScreen = ({ navigation }: OnboardingScreenProps) => {
       // Refetch the profile to trigger navigation in RootNavigator
       refetchUserProfile();
     } catch (err: unknown) {
-      Alert.alert("Erro", "Não foi possível salvar o perfil: " + getFirebaseErrorMessage(err));
+      Alert.alert(
+        "Erro",
+        "Não foi possível salvar o perfil: " + getFirebaseErrorMessage(err)
+      );
     } finally {
       setSaving(false);
     }
@@ -112,13 +136,15 @@ const OnboardingScreen = ({ navigation }: OnboardingScreenProps) => {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Complete seu Perfil</Text>
-      <Text style={styles.subtitle}>Conte-nos um pouco sobre você para começar a trocar habilidades!</Text>
+      <Text style={styles.subtitle}>
+        Conte-nos um pouco sobre você para começar a trocar habilidades!
+      </Text>
 
       <Text style={styles.label}>Seu Nome:</Text>
       <TextInput
         style={styles.input}
         placeholder="Nome completo"
-        value={profileData?.name || ''}
+        value={profileData?.name || ""}
         onChangeText={(text) => setProfileData({ ...profileData, name: text })}
       />
 
@@ -126,12 +152,14 @@ const OnboardingScreen = ({ navigation }: OnboardingScreenProps) => {
       <TextInput
         style={[styles.input, styles.bioInput]}
         placeholder="Fale um pouco sobre suas paixões e o que você busca no Nexo..."
-        value={profileData?.bio || ''}
+        value={profileData?.bio || ""}
         onChangeText={(text) => setProfileData({ ...profileData, bio: text })}
         multiline
       />
 
-      <Text style={styles.label}>Suas Habilidades (o que você ensina ou quer aprender):</Text>
+      <Text style={styles.label}>
+        Suas Habilidades (o que você ensina ou quer aprender):
+      </Text>
       <View style={styles.skillInputContainer}>
         <TextInput
           style={[styles.input, styles.skillTextInput]}
@@ -139,7 +167,12 @@ const OnboardingScreen = ({ navigation }: OnboardingScreenProps) => {
           value={newSkill}
           onChangeText={setNewSkill}
         />
-        <AppButton title="Add" onPress={handleAddSkill} variant="secondary" style={styles.addSkillButton} />
+        <AppButton
+          title="Add"
+          onPress={handleAddSkill}
+          variant="secondary"
+          style={styles.addSkillButton}
+        />
       </View>
 
       <FlatList
@@ -148,12 +181,18 @@ const OnboardingScreen = ({ navigation }: OnboardingScreenProps) => {
         renderItem={({ item }) => (
           <View style={styles.skillItem}>
             <Text style={styles.skillText}>{item}</Text>
-            <TouchableOpacity onPress={() => handleRemoveSkill(item)} style={styles.removeSkillButton}>
+            <TouchableOpacity
+              onPress={() => handleRemoveSkill(item)}
+              style={styles.removeSkillButton}>
               <Text style={styles.removeSkillText}>X</Text>
             </TouchableOpacity>
           </View>
         )}
-        ListEmptyComponent={<Text style={styles.noSkillsText}>Adicione suas primeiras habilidades!</Text>}
+        ListEmptyComponent={
+          <Text style={styles.noSkillsText}>
+            Adicione suas primeiras habilidades!
+          </Text>
+        }
         style={styles.skillsList}
       />
 
@@ -176,31 +215,31 @@ const styles = StyleSheet.create({
   },
   centered: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   title: {
     fontSize: FONT_SIZES.h1,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     marginBottom: 10,
     color: COLORS.textDark,
-    textAlign: 'center',
+    textAlign: "center",
   },
   subtitle: {
     fontSize: FONT_SIZES.body,
     color: COLORS.textMedium,
-    textAlign: 'center',
+    textAlign: "center",
     marginBottom: 20,
   },
   label: {
     fontSize: FONT_SIZES.body,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     color: COLORS.textDark,
     marginBottom: 5,
     marginTop: 10,
   },
   input: {
-    width: '100%',
+    width: "100%",
     height: 50,
     borderColor: COLORS.lightGray,
     borderWidth: 1,
@@ -212,11 +251,11 @@ const styles = StyleSheet.create({
   },
   bioInput: {
     height: 100,
-    textAlignVertical: 'top',
+    textAlignVertical: "top",
   },
   skillInputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginBottom: 10,
   },
   skillTextInput: {
@@ -229,14 +268,14 @@ const styles = StyleSheet.create({
     marginVertical: 0,
   },
   skillsList: {
-    width: '100%',
+    width: "100%",
     maxHeight: 150,
     marginBottom: 20,
   },
   skillItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     backgroundColor: COLORS.white,
     padding: 10,
     borderRadius: 8,
@@ -253,24 +292,24 @@ const styles = StyleSheet.create({
     borderRadius: 15,
     width: 30,
     height: 30,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   removeSkillText: {
     color: COLORS.white,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     fontSize: FONT_SIZES.caption,
   },
   noSkillsText: {
     fontSize: FONT_SIZES.body,
     color: COLORS.textMedium,
-    textAlign: 'center',
+    textAlign: "center",
     marginTop: 10,
   },
   errorText: {
     color: COLORS.danger,
     fontSize: FONT_SIZES.body,
-    textAlign: 'center',
+    textAlign: "center",
     marginBottom: 10,
   },
   saveButton: {

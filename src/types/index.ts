@@ -1,5 +1,9 @@
 import { Timestamp } from 'firebase/firestore';
 
+// =================================================================
+// --- Tipos de Dados Principais ---
+// =================================================================
+
 export interface UserProfile {
   id: string;
   email: string;
@@ -12,6 +16,7 @@ export interface UserProfile {
   createdAt: Timestamp;
   completedTradesCount?: number;
   completedTradesAsTeacher?: number;
+
 }
 
 export interface OnboardingProfile extends UserProfile {
@@ -44,6 +49,17 @@ export interface Review {
   reviewerProfile?: UserProfile;
 }
 
+export interface Chat {
+  id: string;
+  participants: string[];
+  createdAt: Timestamp;
+  lastMessage?: {
+    text: string;
+    senderId: string;
+    createdAt: Timestamp;
+  };
+}
+
 export interface Message {
   id: string;
   senderId: string;
@@ -68,19 +84,8 @@ export interface Badge {
   icon: string;
 }
 
-export interface Chat {
-  id: string;
-  participants: string[];
-  createdAt: Timestamp;
-  lastMessage?: {
-    text: string;
-    senderId: string;
-    createdAt: Timestamp;
-  };
-}
-
 export interface EarnedBadge {
-  id: string; // <-- ADICIONE ESTA LINHA
+  id: string;
   badgeId: string;
   earnedAt: Timestamp;
 }
@@ -94,20 +99,31 @@ export interface Notification {
     createdAt: Timestamp;
 }
 
+
+// =================================================================
+// --- Tipos para Navegação (React Navigation) ---
+// =================================================================
+
 export type RootStackParamList = {
   Login: undefined;
   Register: undefined;
+  Onboarding: undefined;
   HomeMain: undefined;
+  ProposalsMain: undefined;
+  Profile: undefined; // ✅ ADICIONE ESTA LINHA
   UserProfileDetail: { userId: string; userProfile?: UserProfile };
   Proposal: { receiverId: string; receiverEmail: string };
   EditProfile: { profile: UserProfile };
   Review: { proposalId: string; revieweeId: string };
   Chat: { chatId: string; otherUserId: string };
-  ProposalsMain: undefined;
-  Profile: undefined;
-  Onboarding: undefined;
   Notifications: undefined;
   About: undefined;
+};
+
+export type HomeTabParamList = {
+    Home: undefined; // Nome da sua tela inicial na Tab
+    ProposalsMain: undefined; // Tela que contém as abas de Propostas
+    Profile: undefined; // Sua tela de Perfil
 };
 
 export type ProposalsTabParamList = {

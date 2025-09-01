@@ -1,9 +1,9 @@
 import React from "react";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 
-import ProfileScreen from "../screens/ProfileScreen/index.tsx";
-import EditProfileScreen from "../screens/EditProfileScreen/index.tsx";
-import AboutScreen from "../screens/AboutScreen/index.tsx"; // New import
+import ProfileScreen from "../screens/ProfileScreen";
+import EditProfileScreen from "../screens/EditProfileScreen";
+import AboutScreen from "../screens/AboutScreen"; // New import
 import { RootStackParamList } from "../types";
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
