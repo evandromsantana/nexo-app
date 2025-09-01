@@ -1,39 +1,28 @@
-import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged as firebaseOnAuthStateChanged } from "firebase/auth";
-import app from './firebase.ts'; // Assuming firebase.js exports the initialized app
+import {
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  signOut as firebaseSignOut, // Renomeado para evitar conflito de nomes
+  UserCredential
+} from 'firebase/auth';
+import { auth } from './firebaseConfig';
 
-const auth = getAuth(app);
-
-export const register = async (email: string, password: string) => {
-  try {
-    return await createUserWithEmailAndPassword(auth, email, password);
-  } catch (error) {
-    console.error("Error during registration:", error);
-    throw error;
-  }
+/**
+ * Registra um novo usuário com e-mail e senha.
+ */
+export const register = (email: string, pass: string): Promise<UserCredential> => {
+  return createUserWithEmailAndPassword(auth, email, pass);
 };
 
-export const login = async (email: string, password: string) => {
-  try {
-    return await signInWithEmailAndPassword(auth, email, password);
-  } catch (error) {
-    console.error("Error during login:", error);
-    throw error;
-  }
+/**
+ * Autentica um usuário existente com e-mail e senha.
+ */
+export const login = (email: string, pass: string): Promise<UserCredential> => {
+  return signInWithEmailAndPassword(auth, email, pass);
 };
 
-export const logout = async () => {
-  try {
-    return await signOut(auth);
-  } catch (error) {
-    console.error("Error during logout:", error);
-    throw error;
-  }
-};
-
-export const getCurrentUser = () => {
-  return auth.currentUser;
-};
-
-export const onAuthStateChanged = (callback: (user: any) => void) => {
-  return firebaseOnAuthStateChanged(auth, callback);
+/**
+ * Desconecta o usuário atualmente logado.
+ */
+export const signOut = (): Promise<void> => {
+  return firebaseSignOut(auth);
 };

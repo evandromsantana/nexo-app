@@ -120,6 +120,12 @@ export type RootStackParamList = {
   About: undefined;
 };
 
+export interface UserInfo {
+  uid: string;
+  name: string;
+  avatarUrl?: string;
+}
+
 export type HomeTabParamList = {
     Home: undefined; // Nome da sua tela inicial na Tab
     ProposalsMain: undefined; // Tela que contém as abas de Propostas

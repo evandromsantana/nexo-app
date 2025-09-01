@@ -11,15 +11,16 @@ import {
   SafeAreaView,
   Alert,
 } from "react-native";
-import { searchUsers, getSuggestedUsers } from "../../api/firestore.ts";
-import { useAuth } from "../../hooks/useAuth";
-import { COLORS, FONT_SIZES } from "../../constants";
-import AppButton from "../../components/common/AppButton.tsx";
+import { searchUsers, getSuggestedUsers } from "../api/firestore.ts";
+// import { useAuth } from "../hooks/useAuth";
+import { COLORS, FONT_SIZES } from "../constants";
+import AppButton from "../components/common/AppButton.tsx";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
-import { RootStackParamList, UserProfile } from "../../types";
-import { getFirebaseErrorMessage } from "../../utils/errorUtils";
+import { RootStackParamList, UserProfile } from "../types";
+import { getFirebaseErrorMessage } from "../utils/errorUtils";
 import { Ionicons } from "@expo/vector-icons";
 import { MotiView } from "moti";
+import { useAuth } from "../contexts/AuthContext.tsx";
 
 type HomeScreenProps = NativeStackScreenProps<RootStackParamList, "HomeMain">;
 

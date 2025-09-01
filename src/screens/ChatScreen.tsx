@@ -1,251 +1,125 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { View, Text, TextInput, Alert, StyleSheet, FlatList, KeyboardAvoidingView, Platform, Modal, TouchableOpacity } from 'react-native';
-import DateTimePicker from '@react-native-community/datetimepicker'; // For date/time picker
-import { useAuth } from '../../hooks/useAuth.ts';
-import { getMessages, sendMessage, getUserProfile, suggestMeetingPoint, getMeetingPoints, updateMeetingPointStatus } from '../../api/firestore.ts';
-import { getFirebaseErrorMessage } from "../../utils/errorUtils";
-import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { RootStackParamList, Message, UserProfile, MeetingPoint } from '../../types';
-import { COLORS, FONT_SIZES } from '../../constants';
-import AppButton from '../../components/common/AppButton.tsx';
-import { FirebaseError } from 'firebase/app';
+// src/screens/ChatScreen.tsx
 
-type ChatScreenProps = NativeStackScreenProps<RootStackParamList, 'Chat'>;
+import React, { useState, useEffect, useCallback, useContext } from "react";
+import { View, Text, StyleSheet } from "react-native";
+import {
+  GiftedChat,
+  IMessage,
+  Bubble,
+  InputToolbar,
+} from "react-native-gifted-chat";
+import { useRoute, useNavigation } from "@react-navigation/native";
+import { useAuth } from "../contexts/AuthContext";
+import { getMessages, sendMessage, getUserProfile } from "../api/firestore";
+import { Message, UserProfile } from "../types";
+import { COLORS } from "../constants";
+import { Timestamp } from "firebase/firestore";
+import AppButton from "../components/common/AppButton"; // Para o botão de "Sugerir Encontro"
 
-const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
+const ChatScreen = () => {
+  const route = useRoute();
+  const navigation = useNavigation();
   const { user } = useAuth();
-  const { chatId, otherUserId } = route.params;
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [meetingPoints, setMeetingPoints] = useState<MeetingPoint[]>([]);
-  const [newMessage, setNewMessage] = useState('');
-  const [otherUserProfile, setOtherUserProfile] = useState<UserProfile | null>(null);
 
-  // State for message sending
-  const [sendingMessage, setSendingMessage] = useState(false);
+  const { chatId, otherUserId } = route.params as {
+    chatId: string;
+    otherUserId: string;
+  };
 
-  // State for meeting point modal
-  const [isSuggestMeetingModalVisible, setSuggestMeetingModalVisible] = useState(false);
-  const [suggestedLocation, setSuggestedLocation] = useState('');
-  const [suggestedDateTime, setSuggestedDateTime] = useState(new Date());
-  const [showDatePicker, setShowDatePicker] = useState(false);
-  const [showTimePicker, setShowTimePicker] = useState(false);
-  const [suggestingMeeting, setSuggestingMeeting] = useState(false);
-  const [updatingStatus, setUpdatingStatus] = useState(false);
+  const [messages, setMessages] = useState<IMessage[]>([]);
+  const [otherUserProfile, setOtherUserProfile] = useState<UserProfile | null>(
+    null
+  );
 
   useEffect(() => {
-    const fetchOtherUserProfile = async () => {
-      try {
-        const profile = await getUserProfile(otherUserId);
+    // Busca o perfil do outro usuário para mostrar o nome no header
+    getUserProfile(otherUserId).then((profile) => {
+      if (profile) {
         setOtherUserProfile(profile);
-      } catch (error) {
-        console.error("Error fetching other user profile:", error);
-        Alert.alert("Erro", "Não foi possível carregar o perfil do outro usuário.");
+        navigation.setOptions({ title: profile.name || profile.email });
       }
-    };
-    fetchOtherUserProfile();
-  }, [otherUserId]);
-
-  useEffect(() => {
-    const unsubscribeMessages = getMessages(chatId, (msgs) => {
-      setMessages(msgs);
-    }, (error) => {
-      console.error("Error listening to messages in UI:", error);
-      Alert.alert("Erro", "Não foi possível carregar as mensagens em tempo real.");
     });
 
-    const unsubscribeMeetingPoints = getMeetingPoints(chatId, (mps) => {
-      setMeetingPoints(mps);
-    }, (error) => {
-      console.error("Error listening to meeting points in UI:", error);
-      Alert.alert("Erro", "Não foi possível carregar os pontos de encontro em tempo real.");
-    });
+    // Ouve as mensagens em tempo real
+    const unsubscribe = getMessages(
+      chatId,
+      (firebaseMessages: Message[]) => {
+        const formattedMessages = firebaseMessages.map((msg) => ({
+          _id: msg.id,
+          text: msg.text,
+          createdAt: (msg.createdAt as Timestamp).toDate(),
+          user: {
+            _id: msg.senderId,
+            // Podemos adicionar name e avatar se quisermos mostrar na bolha
+          },
+        }));
+        setMessages(formattedMessages);
+      },
+      (error) => {
+        console.error(error);
+      }
+    );
 
-    return () => {
-      unsubscribeMessages();
-      unsubscribeMeetingPoints();
-    };
-  }, [chatId]);
+    return () => unsubscribe();
+  }, [chatId, otherUserId]);
 
-  const handleSendMessage = async () => {
-    if (newMessage.trim() === '' || !user) return;
+  const onSend = useCallback(
+    (newMessages: IMessage[] = []) => {
+      if (user) {
+        const { text } = newMessages[0];
+        sendMessage(chatId, user.uid, text);
+      }
+    },
+    [chatId, user]
+  );
 
-    setSendingMessage(true);
-    try {
-      await sendMessage(chatId, user.uid, newMessage, otherUserId);
-      setNewMessage('');
-    } catch (error: unknown) {
-      const errorMessage = getFirebaseErrorMessage(error);
-      Alert.alert("Erro", errorMessage);
-    } finally {
-      setSendingMessage(false);
-    }
-  };
+  // Função para renderizar a barra de ferramentas customizada
+  const renderInputToolbar = (props) => (
+    <InputToolbar
+      {...props}
+      containerStyle={styles.inputToolbar}
+      primaryStyle={{ alignItems: "center" }}
+    />
+  );
 
-  const handleSuggestMeeting = async () => {
-    if (!user || !suggestedLocation.trim()) {
-      Alert.alert("Erro", "Por favor, preencha o local sugerido.");
-      return;
-    }
-    setSuggestingMeeting(true);
-    try {
-      await suggestMeetingPoint(chatId, user.uid, suggestedLocation, suggestedDateTime);
-      Toast.show({
-      type: "success",
-      text1: "Sucesso!",
-      text2: "Ponto de encontro sugerido!",
-    });
-      setSuggestMeetingModalVisible(false);
-      setSuggestedLocation('');
-      setSuggestedDateTime(new Date());
-    } catch (error: unknown) {
-      const errorMessage = getFirebaseErrorMessage(error);
-      Alert.alert("Erro", errorMessage);
-    } finally {
-      setSuggestingMeeting(false);
-    }
-  };
+  // Você ainda pode adicionar o botão "Sugerir Encontro"
+  // Esta é uma maneira de adicioná-lo, mas existem outras mais elegantes
+  const renderActions = (props) => (
+    <AppButton
+      title="Sugerir Encontro"
+      onPress={() => console.log("Abrir modal de encontro")}
+    />
+  );
 
-  const handleUpdateMeetingStatus = async (meetingPointId: string, status: 'accepted' | 'rejected') => {
-    setUpdatingStatus(true);
-    try {
-      await updateMeetingPointStatus(chatId, meetingPointId, status);
-      Toast.show({
-        type: "success",
-        text1: "Sucesso!",
-        text2: `Ponto de encontro ${status === 'accepted' ? 'aceito' : 'rejeitado'}!`, 
-      });
-    } catch (error: unknown) {
-      setUpdatingStatus(false);
-    }
-  };
-
-  const onDateChange = (event: any, selectedDate?: Date) => {
-    const currentDate = selectedDate || suggestedDateTime;
-    setShowDatePicker(Platform.OS === 'ios');
-    setSuggestedDateTime(currentDate);
-  };
-
-  const onTimeChange = (event: any, selectedTime?: Date) => {
-    const currentTime = selectedTime || suggestedDateTime;
-    setShowTimePicker(Platform.OS === 'ios');
-    setSuggestedDateTime(currentTime);
-  };
-
-  const renderItem = ({ item }: { item: Message | MeetingPoint }) => {
-    if ('text' in item) { // It's a message
-      return (
-        <View style={[
-          styles.messageBubble,
-          item.senderId === user?.uid ? styles.myMessage : styles.otherMessage
-        ]}>
-          <Text style={styles.messageText}>{item.text}</Text>
-          <Text style={styles.messageTime}>{item.createdAt?.toDate().toLocaleTimeString()}</Text>
-        </View>
-      );
-    } else { // It's a meeting point
-      const isSender = item.senderId === user?.uid;
-      return (
-        <View style={[
-          styles.meetingPointBubble,
-          isSender ? styles.myMeetingPoint : styles.otherMeetingPoint
-        ]}>
-          <Text style={styles.meetingPointTitle}>Ponto de Encontro Sugerido</Text>
-          <Text style={styles.meetingPointText}>Local: {item.location}</Text>
-          <Text style={styles.meetingPointText}>Data: {item.dateTime?.toDate().toLocaleDateString()}</Text>
-          <Text style={styles.meetingPointText}>Hora: {item.dateTime?.toDate().toLocaleTimeString()}</Text>
-          <Text style={styles.meetingPointStatus}>Status: {item.status}</Text>
-          {item.status === 'pending' && !isSender && (
-            <View style={styles.meetingPointActions}>
-              <AppButton title="Aceitar" onPress={() => handleUpdateMeetingStatus(item.id, 'accepted')} variant="success" style={styles.meetingActionButton} loading={updatingStatus} />
-              <AppButton title="Rejeitar" onPress={() => handleUpdateMeetingStatus(item.id, 'rejected')} variant="danger" style={styles.meetingActionButton} loading={updatingStatus} />
-            </View>
-          )}
-        </View>
-      );
-    }
-  };
-
-  const combinedChatItems = useMemo(() => {
-    const allItems = [...messages, ...meetingPoints];
-    return allItems.sort((a, b) => (a.createdAt?.toMillis() || 0) - (b.createdAt?.toMillis() || 0));
-  }, [messages, meetingPoints]);
+  if (!user) return null;
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0} // Adjust as needed
-    >
-      <Text style={styles.chatHeader}>Chat com {otherUserProfile?.name || otherUserProfile?.email || 'Usuário'}</Text>
-      <FlatList
-        data={combinedChatItems}
-        keyExtractor={(item, index) => item.id + (item as any).type + index} // Add type to key for uniqueness
-        renderItem={renderItem}
-        inverted={true} // Show latest messages at the bottom
-        style={styles.messagesList}
+    <View style={styles.container}>
+      <GiftedChat
+        messages={messages}
+        onSend={(messages) => onSend(messages)}
+        user={{
+          _id: user.uid,
+        }}
+        placeholder="Digite sua mensagem..."
+        alwaysShowSend
+        renderBubble={(props) => (
+          <Bubble
+            {...props}
+            wrapperStyle={{
+              right: { backgroundColor: COLORS.primary },
+              left: { backgroundColor: COLORS.white },
+            }}
+            textStyle={{
+              right: { color: COLORS.white },
+              left: { color: COLORS.textDark },
+            }}
+          />
+        )}
+        renderInputToolbar={renderInputToolbar}
+        // renderActions={renderActions} // Descomente para adicionar o botão
       />
-      <View style={styles.inputContainer}>
-        <TextInput
-          style={styles.messageInput}
-          value={newMessage}
-          onChangeText={setNewMessage}
-          placeholder="Digite sua mensagem..."
-          multiline
-        />
-        <AppButton title="Enviar" onPress={handleSendMessage} loading={sendingMessage} variant="primary" style={styles.sendButton} />
-        <AppButton title="Sugerir Encontro" onPress={() => setSuggestMeetingModalVisible(true)} variant="secondary" style={styles.suggestMeetingButton} />
-      </View>
-
-      {/* Suggest Meeting Modal */}
-      <Modal
-        animationType="slide"
-        transparent={true}
-        visible={isSuggestMeetingModalVisible}
-        onRequestClose={() => setSuggestMeetingModalVisible(false)}
-      >
-        <View style={styles.modalContainer}>
-          <View style={styles.modalView}>
-            <Text style={styles.modalTitle}>Sugerir Ponto de Encontro</Text>
-            
-            <TextInput
-              style={styles.modalInput}
-              placeholder="Local do encontro"
-              value={suggestedLocation}
-              onChangeText={setSuggestedLocation}
-            />
-
-            <TouchableOpacity onPress={() => setShowDatePicker(true)} style={styles.datePickerButton}>
-              <Text>Data: {suggestedDateTime.toLocaleDateString()}</Text>
-            </TouchableOpacity>
-            {showDatePicker && (
-              <DateTimePicker
-                value={suggestedDateTime}
-                mode="date"
-                display="default"
-                onChange={onDateChange}
-              />
-            )}
-
-            <TouchableOpacity onPress={() => setShowTimePicker(true)} style={styles.datePickerButton}>
-              <Text>Hora: {suggestedDateTime.toLocaleTimeString()}</Text>
-            </TouchableOpacity>
-            {showTimePicker && (
-              <DateTimePicker
-                value={suggestedDateTime}
-                mode="time"
-                display="default"
-                onChange={onTimeChange}
-              />
-            )}
-
-            <View style={styles.modalButtonContainer}>
-              <AppButton title="Cancelar" onPress={() => setSuggestMeetingModalVisible(false)} variant="danger" style={styles.flexButton} />
-              <AppButton title="Sugerir" onPress={handleSuggestMeeting} loading={suggestingMeeting} variant="primary" style={styles.flexButton} />
-            </View>
-          </View>
-        </View>
-      </Modal>
-    </KeyboardAvoidingView>
+    </View>
   );
 };
 
@@ -254,170 +128,10 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.background,
   },
-  chatHeader: {
-    fontSize: FONT_SIZES.h2,
-    fontWeight: 'bold',
-    textAlign: 'center',
-    paddingBottom: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.lightGray,
-    color: COLORS.textDark,
-    paddingTop: Platform.OS === 'android' ? 20 : 0, // Adjust for Android status bar
-  },
-  messagesList: {
-    flex: 1,
-    paddingHorizontal: 10,
-  },
-  messageBubble: {
-    padding: 10,
-    borderRadius: 10,
-    marginBottom: 8,
-    maxWidth: '80%',
-  },
-  myMessage: {
-    alignSelf: 'flex-end',
-    backgroundColor: COLORS.secondary, // Light green
-  },
-  otherMessage: {
-    alignSelf: 'flex-start',
-    backgroundColor: COLORS.white, // Light gray
-  },
-  messageText: {
-    fontSize: FONT_SIZES.body,
-    color: COLORS.textDark,
-  },
-  messageTime: {
-    fontSize: FONT_SIZES.caption,
-    color: COLORS.textMedium,
-    alignSelf: 'flex-end',
-    marginTop: 5,
-  },
-  inputContainer: {
-    flexDirection: 'row',
-    padding: 10,
-    borderTopWidth: 1,
+  inputToolbar: {
+    backgroundColor: COLORS.white,
     borderTopColor: COLORS.lightGray,
-    alignItems: 'center',
-  },
-  messageInput: {
-    flex: 1,
-    borderColor: COLORS.lightGray,
-    borderWidth: 1,
-    borderRadius: 20,
-    paddingHorizontal: 15,
-    paddingVertical: 8,
-    marginRight: 10,
-    maxHeight: 100, // Limit height for multiline input
-    backgroundColor: COLORS.white,
-    fontSize: FONT_SIZES.body,
-    color: COLORS.textDark,
-  },
-  sendButton: {
-    width: 80,
-    height: 40,
-    marginVertical: 0,
-  },
-  suggestMeetingButton: {
-    width: 120,
-    height: 40,
-    marginVertical: 0,
-    marginLeft: 10,
-  },
-  // Meeting Point Styles
-  meetingPointBubble: {
-    padding: 10,
-    borderRadius: 10,
-    marginBottom: 8,
-    maxWidth: '80%',
-    borderWidth: 1,
-    borderColor: COLORS.primary,
-  },
-  myMeetingPoint: {
-    alignSelf: 'flex-end',
-    backgroundColor: COLORS.primary + '1A', // Primary with some transparency
-  },
-  otherMeetingPoint: {
-    alignSelf: 'flex-start',
-    backgroundColor: COLORS.white,
-  },
-  meetingPointTitle: {
-    fontSize: FONT_SIZES.body,
-    fontWeight: 'bold',
-    marginBottom: 5,
-    color: COLORS.textDark,
-  },
-  meetingPointText: {
-    fontSize: FONT_SIZES.caption,
-    color: COLORS.textMedium,
-    marginBottom: 3,
-  },
-  meetingPointStatus: {
-    fontSize: FONT_SIZES.caption,
-    fontWeight: 'bold',
-    marginTop: 5,
-    color: COLORS.textDark,
-  },
-  meetingPointActions: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginTop: 10,
-    gap: 10,
-  },
-  meetingActionButton: {
-    flex: 1,
-  },
-  // Modal Styles
-  modalContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.5)',
-  },
-  modalView: {
-    width: '90%',
-    backgroundColor: COLORS.white,
-    borderRadius: 20,
-    padding: 25,
-    alignItems: 'center',
-    elevation: 5,
-  },
-  modalTitle: {
-    fontSize: FONT_SIZES.h2,
-    fontWeight: 'bold',
-    marginBottom: 15,
-    color: COLORS.textDark,
-  },
-  modalInput: {
-    width: '100%',
-    height: 50,
-    borderColor: COLORS.lightGray,
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    marginBottom: 20,
-    backgroundColor: COLORS.white,
-    fontSize: FONT_SIZES.body,
-    color: COLORS.textDark,
-  },
-  datePickerButton: {
-    width: '100%',
-    padding: 15,
-    borderColor: COLORS.lightGray,
-    borderWidth: 1,
-    borderRadius: 8,
-    marginBottom: 10,
-    alignItems: 'center',
-    backgroundColor: COLORS.white,
-  },
-  modalButtonContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    width: '100%',
-    marginTop: 20,
-    gap: 10,
-  },
-  flexButton: {
-    flex: 1,
+    borderTopWidth: 1,
   },
 });
 

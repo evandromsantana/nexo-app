@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -10,220 +10,171 @@ import {
   ScrollView,
   Alert,
 } from "react-native";
-import { useAuth } from "../../hooks/useAuth.ts";
-import { getUserProfile, updateUserProfile } from "../../api/firestore.ts";
-import { NativeStackScreenProps } from "@react-navigation/native-stack";
-import { COLORS, FONT_SIZES } from "../../constants";
-import AppButton from "../../components/common/AppButton.tsx";
+import { useNavigation } from "@react-navigation/native";
+import { useAuth } from "../contexts/AuthContext";
+import { updateUserProfile } from "../api/firestore";
 import * as ImagePicker from "expo-image-picker";
-import { MediaType } from "expo-image-picker";
-
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import app from "../../api/firebase.ts";
-import { getFirebaseErrorMessage } from "../../utils/errorUtils";
+import { getFirebaseErrorMessage } from "../utils/errorUtils";
 import { Ionicons } from "@expo/vector-icons";
-import { UserProfile } from "../../types";
-import Toast from "react-native-toast-message"; // NOVO: Para notificações
+import { UserProfile } from "../types";
+import Toast from "react-native-toast-message";
+import { COLORS, FONT_SIZES } from "../constants";
+import AppButton from "../components/common/AppButton";
 
-type ProfileStackParamList = {
-  Profile: undefined;
-  EditProfile: { profile: UserProfile };
-};
+// =================================================================
+// --- Componente Modularizado do Avatar (com Tipagem Corrigida) ---
+// =================================================================
 
-type EditProfileScreenProps = NativeStackScreenProps<
-  ProfileStackParamList,
-  "EditProfile"
->;
+interface AvatarPickerProps {
+  imageUri: string | null;
+  onImagePicked: (uri: string) => void;
+}
 
-const storage = getStorage(app);
-
-const EditProfileScreen = ({ navigation }: EditProfileScreenProps) => {
-  const { user, refetchUserProfile } = useAuth();
-  const [profileData, setProfileData] = useState<Partial<UserProfile>>({});
-  const [newSkill, setNewSkill] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [image, setImage] = useState<string | null>(null);
-
-  useEffect(() => {
-    const fetchProfile = async () => {
-      if (!user) {
-        setError("Usuário não autenticado.");
-        setLoading(false);
-        return;
-      }
-      try {
-        const currentProfile = await getUserProfile(user.uid);
-        if (currentProfile) {
-          setProfileData({
-            name: currentProfile.name || '',
-            bio: currentProfile.bio || '',
-            skills: currentProfile.skills || [],
-            avatarUrl: currentProfile.avatarUrl || null, // Load existing avatar
-          });
-          setImage(currentProfile.avatarUrl || null);
-        }
-      } catch (err: unknown) {
-        setError("Erro ao carregar perfil: " + getFirebaseErrorMessage(err));
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchProfile();
-  }, [user]);
-
+const AvatarPicker = ({ imageUri, onImagePicked }: AvatarPickerProps) => {
   const pickImage = async () => {
-  try {
-    // Request permissions first
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') {
+    if (status !== "granted") {
       Alert.alert(
         "Permissão Necessária",
-        "Precisamos de permissão para acessar sua galeria de fotos para que você possa escolher uma imagem de perfil."
+        "Precisamos de acesso à sua galeria para escolher uma foto."
       );
       return;
     }
 
     let result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: MediaType.Images,
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
       aspect: [1, 1],
-      quality: 1,
+      quality: 0.8,
     });
-
-    console.log("ImagePicker Result:", result); // Log the result
 
     if (!result.canceled) {
-      setImage(result.assets[0].uri);
-      console.log("Image URI set:", result.assets[0].uri);
-    } else {
-      console.log("Image picking cancelled or failed.");
+      onImagePicked(result.assets[0].uri);
     }
-  } catch (error) {
-    console.error("Error during image picking:", error);
-    Alert.alert("Erro", "Ocorreu um erro ao tentar selecionar a imagem.");
-  }
+  };
+
+  return (
+    <TouchableOpacity onPress={pickImage} style={styles.avatarContainer}>
+      {imageUri ? (
+        <Image source={{ uri: imageUri }} style={styles.avatar} />
+      ) : (
+        <View style={styles.avatarPlaceholder}>
+          <Ionicons name="camera" size={40} color={COLORS.textMedium} />
+        </View>
+      )}
+      <View style={styles.avatarEditOverlay}>
+        <Ionicons name="pencil" size={18} color={COLORS.white} />
+      </View>
+    </TouchableOpacity>
+  );
 };
 
-  const uploadImage = async (uri: string): Promise<string | null> => {
-  if (!user) return null;
-  try {
-    const response = await fetch(uri);
-    const blob = await response.blob();
-    const storageRef = ref(storage, `avatars/${user.uid}`);
-    await uploadBytes(storageRef, blob);
-    const downloadURL = await getDownloadURL(storageRef);
-    return downloadURL;
-  } catch (error) {
-    console.error("Error uploading image:", error);
-    Toast.show({
-      type: "error",
-      text1: "Erro ao fazer upload da imagem",
-      text2: getFirebaseErrorMessage(error),
-    });
-    return null;
-  }
-};
+// =================================================================
+// --- Componente Principal da Tela ---
+// =================================================================
 
-  // MELHORIA: Validação para adicionar habilidades
+const EditProfileScreen = () => {
+  const navigation = useNavigation();
+  const { user, userProfile, refetchUserProfile } = useAuth();
+
+  const [name, setName] = useState("");
+  const [bio, setBio] = useState("");
+  const [skills, setSkills] = useState<string[]>([]);
+  const [newSkill, setNewSkill] = useState("");
+  const [avatarUri, setAvatarUri] = useState<string | null>(null);
+
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (userProfile) {
+      setName(userProfile.name || "");
+      setBio(userProfile.bio || "");
+      setSkills(userProfile.skills || []);
+      setAvatarUri(userProfile.avatarUrl || null);
+      setLoading(false);
+    } else if (!user) {
+      setLoading(false);
+    }
+  }, [userProfile, user]);
+
+  const uploadImage = useCallback(
+    async (uri: string): Promise<string> => {
+      if (!user) throw new Error("Usuário não autenticado.");
+
+      const response = await fetch(uri);
+      const blob = await response.blob();
+      const storage = getStorage();
+      const storageRef = ref(storage, `avatars/${user.uid}`);
+      await uploadBytes(storageRef, blob);
+      return getDownloadURL(storageRef);
+    },
+    [user]
+  );
+
   const handleAddSkill = () => {
     const trimmedSkill = newSkill.trim();
-    if (!trimmedSkill) {
-      Toast.show({
-        type: "error",
-        text1: "Habilidade vazia",
-        text2: "Por favor, digite uma habilidade.",
-      });
+    if (!trimmedSkill) return;
+    if (skills.includes(trimmedSkill)) {
+      Toast.show({ type: "info", text1: "Habilidade já adicionada." });
       return;
     }
-    if (profileData.skills?.includes(trimmedSkill)) {
-      Toast.show({
-        type: "info",
-        text1: "Habilidade duplicada",
-        text2: "Você já adicionou esta habilidade.",
-      });
-      return;
-    }
-    const updatedSkills = [...(profileData.skills || []), trimmedSkill];
-    setProfileData({ ...profileData, skills: updatedSkills });
+    setSkills([...skills, trimmedSkill]);
     setNewSkill("");
   };
 
   const handleRemoveSkill = (skillToRemove: string) => {
-    const updatedSkills = (profileData.skills || []).filter(
-      (skill) => skill !== skillToRemove
-    );
-    setProfileData({ ...profileData, skills: updatedSkills });
-    Toast.show({
-      type: "success",
-      text1: "Habilidade removida!",
-      text2: `'${skillToRemove}' foi removida do seu perfil.`, 
-    });
+    setSkills(skills.filter((skill) => skill !== skillToRemove));
   };
 
-  // MELHORIA: Feedback com Toast e adição do name_lowercase
   const handleSaveProfile = async () => {
     if (!user) return;
 
-    // Add validation for name and skills
-    if (!profileData.name || profileData.name.trim() === '') {
-      Toast.show({
-        type: "error",
-        text1: "Nome obrigatório",
-        text2: "Por favor, preencha seu nome.",
-      });
-      return;
-    }
-    if (!profileData.skills || profileData.skills.length === 0) {
-      Toast.show({
-        type: "error",
-        text1: "Habilidade obrigatória",
-        text2: "Por favor, adicione pelo menos uma habilidade.",
-      });
+    if (!name.trim()) {
+      Toast.show({ type: "error", text1: "Nome obrigatório." });
       return;
     }
 
     setSaving(true);
     try {
-      let finalAvatarUrl: string | null | undefined = profileData.avatarUrl;
-      if (image && image !== profileData.avatarUrl) {
-        finalAvatarUrl = await uploadImage(image);
-      } else if (image === null) {
-        finalAvatarUrl = null;
+      let finalAvatarUrl = userProfile?.avatarUrl;
+
+      if (avatarUri && avatarUri !== userProfile?.avatarUrl) {
+        finalAvatarUrl = await uploadImage(avatarUri);
       }
 
-      const name = profileData.name || "";
       const profileUpdate: Partial<UserProfile> = {
-        name: name,
-        bio: profileData.bio,
-        skills: profileData.skills,
+        name: name.trim(),
+        name_lowercase: name.trim().toLowerCase(),
+        bio: bio.trim(),
+        skills: skills,
         avatarUrl: finalAvatarUrl,
       };
 
       await updateUserProfile(user.uid, profileUpdate);
-      refetchUserProfile();
+      await refetchUserProfile();
 
-      Toast.show({
-        type: "success",
-        text1: "Sucesso!",
-        text2: "Seu perfil foi atualizado.",
-      });
-
-      
+      Toast.show({ type: "success", text1: "Perfil atualizado com sucesso!" });
+      navigation.goBack();
     } catch (err: unknown) {
-      const errorMessage = getFirebaseErrorMessage(err);
       Toast.show({
         type: "error",
-        text1: "Erro Não foi possivel salvar o perfil",
-        text2: errorMessage,
+        text1: "Erro ao salvar",
+        text2: getFirebaseErrorMessage(err),
       });
     } finally {
       setSaving(false);
     }
   };
 
-  // ... (Loading e Error states - sem alterações)
+  if (loading) {
+    return (
+      <View style={styles.centered}>
+        <ActivityIndicator size="large" color={COLORS.primary} />
+      </View>
+    );
+  }
 
   return (
     <ScrollView
@@ -232,34 +183,22 @@ const EditProfileScreen = ({ navigation }: EditProfileScreenProps) => {
       keyboardShouldPersistTaps="handled">
       <Text style={styles.title}>Editar Perfil</Text>
 
-      <TouchableOpacity onPress={() => Alert.alert("Funcionalidade desabilitada", "A seleção de imagem está temporariamente desabilitada.")} style={styles.avatarContainer}>
-        {image ? (
-          <Image source={{ uri: image }} style={styles.avatar} />
-        ) : (
-          <View style={styles.avatarPlaceholder}>
-            <Ionicons name="camera" size={40} color={COLORS.textMedium} />
-          </View>
-        )}
-        {/* NOVO: Ícone de edição sobreposto */}
-        <View style={styles.avatarEditOverlay}>
-          <Ionicons name="pencil" size={18} color={COLORS.white} />
-        </View>
-      </TouchableOpacity>
+      <AvatarPicker imageUri={avatarUri} onImagePicked={setAvatarUri} />
 
       <Text style={styles.label}>Nome</Text>
       <TextInput
         style={styles.input}
         placeholder="Seu nome completo"
-        value={profileData?.name || ""}
-        onChangeText={(text) => setProfileData({ ...profileData, name: text })}
+        value={name}
+        onChangeText={setName}
       />
 
       <Text style={styles.label}>Bio</Text>
       <TextInput
         style={[styles.input, styles.bioInput]}
         placeholder="Fale um pouco sobre você..."
-        value={profileData?.bio || ""}
-        onChangeText={(text) => setProfileData({ ...profileData, bio: text })}
+        value={bio}
+        onChangeText={setBio}
         multiline
       />
 
@@ -267,7 +206,7 @@ const EditProfileScreen = ({ navigation }: EditProfileScreenProps) => {
       <View style={styles.skillInputContainer}>
         <TextInput
           style={[styles.input, styles.skillTextInput]}
-          placeholder="Ex: Violão, Inglês, Culinária..."
+          placeholder="Ex: Violão, Inglês..."
           value={newSkill}
           onChangeText={setNewSkill}
           onSubmitEditing={handleAddSkill}
@@ -279,22 +218,15 @@ const EditProfileScreen = ({ navigation }: EditProfileScreenProps) => {
         </TouchableOpacity>
       </View>
 
-      {/* MELHORIA: Renderização de skills como pílulas */}
       <View style={styles.skillsListContainer}>
-        {(profileData.skills || []).length > 0 ? (
-          (profileData.skills || []).map((skill, index) => (
-            <View key={index} style={styles.skillPill}>
-              <Text style={styles.skillPillText}>{skill}</Text>
-              <TouchableOpacity onPress={() => handleRemoveSkill(skill)}>
-                <Ionicons name="close" size={16} color={COLORS.primary} />
-              </TouchableOpacity>
-            </View>
-          ))
-        ) : (
-          <Text style={styles.noSkillsText}>
-            Nenhuma habilidade adicionada ainda.
-          </Text>
-        )}
+        {skills.map((skill, index) => (
+          <View key={index} style={styles.skillPill}>
+            <Text style={styles.skillPillText}>{skill}</Text>
+            <TouchableOpacity onPress={() => handleRemoveSkill(skill)}>
+              <Ionicons name="close" size={16} color={COLORS.primary} />
+            </TouchableOpacity>
+          </View>
+        ))}
       </View>
 
       <AppButton
@@ -307,6 +239,10 @@ const EditProfileScreen = ({ navigation }: EditProfileScreenProps) => {
     </ScrollView>
   );
 };
+
+// =================================================================
+// --- Estilos ---
+// =================================================================
 
 const styles = StyleSheet.create({
   container: {
@@ -409,7 +345,7 @@ const styles = StyleSheet.create({
   skillPill: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: COLORS.primaryLight,
+    backgroundColor: COLORS.primary,
     borderRadius: 20,
     paddingVertical: 8,
     paddingHorizontal: 12,
@@ -420,17 +356,6 @@ const styles = StyleSheet.create({
     color: COLORS.primary,
     fontWeight: "bold",
     marginRight: 8,
-  },
-  noSkillsText: {
-    fontSize: FONT_SIZES.body,
-    color: COLORS.textMedium,
-    width: "100%",
-    textAlign: "center",
-  },
-  errorText: {
-    color: COLORS.danger,
-    fontSize: FONT_SIZES.body,
-    textAlign: "center",
   },
   saveButton: {
     marginTop: 30,

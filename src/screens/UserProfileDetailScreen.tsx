@@ -1,17 +1,30 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, ActivityIndicator, Alert, StyleSheet } from 'react-native';
-import { getUserProfile, getReviewsForUser, getUsersByIds, getEarnedBadges, getBadgeDetails } from '../../api/firestore.ts';
-import { useAuth } from '../../hooks/useAuth.ts';
-import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { COLORS, FONT_SIZES } from '../../constants';
-import AppButton from '../../components/common/AppButton.tsx';
-import UserProfileDisplay from '../../components/specific/UserProfileDisplay.tsx'; // Import UserProfileDisplay
-import { RootStackParamList, UserProfile, Review, Badge } from '../../types';
-import { getFirebaseErrorMessage } from "../../utils/errorUtils";
+import React, { useState, useEffect } from "react";
+import { View, Text, ActivityIndicator, Alert, StyleSheet } from "react-native";
+import {
+  getUserProfile,
+  getReviewsForUser,
+  getUsersByIds,
+  getEarnedBadges,
+  getBadgeDetails,
+} from "../api/firestore.ts";
 
-type UserProfileDetailScreenProps = NativeStackScreenProps<RootStackParamList, 'UserProfileDetail'>;
+import { NativeStackScreenProps } from "@react-navigation/native-stack";
+import { COLORS, FONT_SIZES } from "../constants";
+import AppButton from "../components/common/AppButton.tsx";
+import UserProfileDisplay from "../components/specific/UserProfileDisplay.tsx"; // Import UserProfileDisplay
+import { RootStackParamList, UserProfile, Review, Badge } from "../types";
+import { getFirebaseErrorMessage } from "../utils/errorUtils";
+import { useAuth } from "../contexts/AuthContext.tsx";
 
-const UserProfileDetailScreen = ({ route, navigation }: UserProfileDetailScreenProps) => {
+type UserProfileDetailScreenProps = NativeStackScreenProps<
+  RootStackParamList,
+  "UserProfileDetail"
+>;
+
+const UserProfileDetailScreen = ({
+  route,
+  navigation,
+}: UserProfileDetailScreenProps) => {
   const { userId } = route.params;
   const { user: currentUser } = useAuth(); // Current logged-in user
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
@@ -36,15 +49,20 @@ const UserProfileDetailScreen = ({ route, navigation }: UserProfileDetailScreenP
         const rawReviews = await getReviewsForUser(userId);
         let calculatedAverageRating = 0; // Use a local variable for calculation
         if (rawReviews.length > 0) {
-          const totalRating = rawReviews.reduce((sum, review) => sum + review.rating, 0);
+          const totalRating = rawReviews.reduce(
+            (sum, review) => sum + review.rating,
+            0
+          );
           calculatedAverageRating = totalRating / rawReviews.length;
 
-          const reviewerIds = [...new Set(rawReviews.map(r => r.reviewerId))];
+          const reviewerIds = [...new Set(rawReviews.map((r) => r.reviewerId))];
           const reviewersMap = await getUsersByIds(reviewerIds);
 
-          const enrichedReviews = rawReviews.map(review => ({
+          const enrichedReviews = rawReviews.map((review) => ({
             ...review,
-            reviewerEmail: reviewersMap.get(review.reviewerId)?.email || 'Usuário desconhecido',
+            reviewerEmail:
+              reviewersMap.get(review.reviewerId)?.email ||
+              "Usuário desconhecido",
           }));
           setReviews(enrichedReviews);
         } else {
@@ -54,10 +72,11 @@ const UserProfileDetailScreen = ({ route, navigation }: UserProfileDetailScreenP
         setAverageRating(calculatedAverageRating); // Set the state here
 
         const badges = await getEarnedBadges(userId);
-        const badgeDetailsPromises = badges.map(badge => getBadgeDetails(badge.badgeId));
+        const badgeDetailsPromises = badges.map((badge) =>
+          getBadgeDetails(badge.badgeId)
+        );
         const detailedBadges = await Promise.all(badgeDetailsPromises);
         setEarnedBadges(detailedBadges.filter(Boolean) as Badge[]);
-
       } catch (err: unknown) {
         const errorMessage = getFirebaseErrorMessage(err);
         setError(errorMessage);
@@ -70,7 +89,7 @@ const UserProfileDetailScreen = ({ route, navigation }: UserProfileDetailScreenP
   }, [userId]);
 
   const handleProposeTrade = (receiverId: string, receiverEmail: string) => {
-    navigation.navigate('Proposal', { receiverId, receiverEmail });
+    navigation.navigate("Proposal", { receiverId, receiverEmail });
   };
 
   if (loading) {
@@ -100,7 +119,7 @@ const UserProfileDetailScreen = ({ route, navigation }: UserProfileDetailScreenP
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Perfil de {userProfile.email}</Text>
-      
+
       <UserProfileDisplay
         userProfile={userProfile}
         reviews={reviews}
@@ -121,15 +140,15 @@ const styles = StyleSheet.create({
   },
   centered: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   title: {
     fontSize: FONT_SIZES.h1,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     marginBottom: 20,
     color: COLORS.textDark,
-    textAlign: 'center',
+    textAlign: "center",
   },
   errorText: {
     color: COLORS.danger,

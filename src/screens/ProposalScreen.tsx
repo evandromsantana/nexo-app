@@ -1,183 +1,95 @@
+// src/screens/ProposalScreen.tsx
+
 import React, { useState } from "react";
-import {
-  View,
-  Text,
-  TextInput,
-  Alert,
-  StyleSheet,
-  ActivityIndicator,
-} from "react-native";
-import { useAuth } from "../../hooks/useAuth.ts";
-import { createProposal } from "../../api/firestore.ts";
-import { COLORS, FONT_SIZES } from "../../constants";
-import AppButton from "../../components/common/AppButton.tsx";
-import { NativeStackScreenProps } from "@react-navigation/native-stack";
-import { RootStackParamList } from "../../types";
-import { FirebaseError } from "firebase/app";
-import { getFirebaseErrorMessage } from "../../utils/errorUtils";
-import { displayMessage } from "../../utils/messageUtils";
+import { View, TextInput, Button, Text } from "react-native";
+import { useRoute } from "@react-navigation/native";
+import { useAuth } from "../contexts/AuthContext";
+import { createProposal } from "../api/firestore";
+import Toast from "react-native-toast-message";
 
-type ProposalScreenProps = NativeStackScreenProps<
-  RootStackParamList,
-  "Proposal"
->;
+const ProposalScreen = () => {
+  const { userProfile } = useAuth();
+  const route = useRoute();
 
-const ProposalScreen = ({ navigation, route }: ProposalScreenProps) => {
-  const { user } = useAuth();
-  const { receiverId, receiverEmail } = route.params; // Receiver's ID and email
+  // Assumes receiverId is passed via navigation
+  const { receiverId } = route.params as { receiverId: string };
+
+  // State to hold user input
   const [skillOffered, setSkillOffered] = useState("");
   const [skillRequested, setSkillRequested] = useState("");
   const [message, setMessage] = useState("");
-  const [errors, setErrors] = useState({
-    skillOffered: "",
-    skillRequested: "",
-    message: "",
-  });
   const [loading, setLoading] = useState(false);
 
-  const validateFields = () => {
-    const newErrors = { skillOffered: "", skillRequested: "", message: "" };
-    let isValid = true;
-
-    if (!skillOffered) {
-      newErrors.skillOffered = "A habilidade oferecida é obrigatória.";
-      isValid = false;
-    }
-    if (!skillRequested) {
-      newErrors.skillRequested = "A habilidade solicitada é obrigatória.";
-      isValid = false;
-    }
-    if (!message) {
-      newErrors.message = "A mensagem é obrigatória.";
-      isValid = false;
-    }
-
-    setErrors(newErrors);
-    return isValid;
-  };
-
-  const handleSubmitProposal = async () => {
-    if (!validateFields()) {
-      return;
-    }
-    if (!user) {
-      Alert.alert(
-        "Erro",
-        "Você precisa estar logado para enviar uma proposta."
-      );
+  const handleSendProposal = async () => {
+    if (!userProfile) {
+      Toast.show({
+        type: "error",
+        text1: "Erro",
+        text2: "Você precisa estar logado.",
+      });
       return;
     }
 
     setLoading(true);
     try {
-      await createProposal(
-        user.uid,
-        receiverId,
-        skillOffered.toLowerCase(), // Lowercase skillOffered
-        skillRequested.toLowerCase(), // Lowercase skillRequested,
-        message
-      );
-      displayMessage("Sucesso", "Proposta enviada com sucesso!", "success");
-      navigation.goBack(); // Go back to the user profile detail screen
-    } catch (error: unknown) {
-      const errorMessage = getFirebaseErrorMessage(error);
-      displayMessage("Erro ao enviar proposta", errorMessage, "error");
+      // ✅ Create the data object with all required properties
+      const proposalData = {
+        senderId: userProfile.id,
+        receiverId: receiverId,
+        skillOffered: skillOffered,
+        skillRequested: skillRequested,
+        message: message,
+        status: "pending" as const, // Status inicial
+      };
+
+      // Pass the complete object to the function
+      await createProposal(proposalData);
+
+      Toast.show({
+        type: "success",
+        text1: "Sucesso!",
+        text2: "Sua proposta foi enviada.",
+      });
+      // navigation.goBack(); // Example: go back after sending
+    } catch (error) {
+      Toast.show({
+        type: "error",
+        text1: "Erro",
+        text2: "Não foi possível enviar a proposta.",
+      });
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Enviar Proposta para {receiverEmail}</Text>
+    <View>
+      <Text>Proposta para: {receiverId}</Text>
 
       <TextInput
-        style={styles.input}
         placeholder="Habilidade que você oferece"
         value={skillOffered}
-        onChangeText={(text) => {
-          setSkillOffered(text);
-          if (errors.skillOffered)
-            setErrors((prev) => ({ ...prev, skillOffered: "" }));
-        }}
+        onChangeText={setSkillOffered}
       />
-      {errors.skillOffered ? (
-        <Text style={styles.errorText}>{errors.skillOffered}</Text>
-      ) : null}
-
       <TextInput
-        style={styles.input}
-        placeholder="Habilidade que você busca"
+        placeholder="Habilidade que você solicita"
         value={skillRequested}
-        onChangeText={(text) => {
-          setSkillRequested(text);
-          if (errors.skillRequested)
-            setErrors({ ...errors, skillRequested: "" });
-        }}
+        onChangeText={setSkillRequested}
       />
-      {errors.skillRequested ? (
-        <Text style={styles.errorText}>{errors.skillRequested}</Text>
-      ) : null}
-
       <TextInput
-        style={[styles.input, styles.messageInput]}
-        placeholder="Escreva uma mensagem para iniciar a conversa..."
+        placeholder="Sua mensagem"
         value={message}
-        onChangeText={(text) => {
-          setMessage(text);
-          if (errors.message) setErrors({ ...errors, message: "" });
-        }}
+        onChangeText={setMessage}
         multiline
       />
-      {errors.message ? (
-        <Text style={styles.errorText}>{errors.message}</Text>
-      ) : null}
 
-      <AppButton
-        title="Enviar Proposta"
-        onPress={handleSubmitProposal}
-        loading={loading}
-        variant="primary"
+      <Button
+        title={loading ? "Enviando..." : "Enviar Proposta"}
+        onPress={handleSendProposal}
+        disabled={loading}
       />
     </View>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 20,
-    backgroundColor: COLORS.background,
-  },
-  title: {
-    fontSize: FONT_SIZES.h2,
-    fontWeight: "bold",
-    marginBottom: 24,
-    textAlign: "center",
-    color: COLORS.textDark,
-  },
-  input: {
-    width: "100%",
-    minHeight: 50,
-    borderColor: COLORS.lightGray,
-    borderWidth: 1,
-    borderRadius: 8,
-    marginBottom: 12,
-    paddingHorizontal: 15,
-    backgroundColor: COLORS.white,
-    paddingTop: 15, // Ensure padding is consistent with multiline
-    paddingBottom: 15,
-  },
-  messageInput: {
-    height: 120,
-    textAlignVertical: "top",
-  },
-  errorText: {
-    color: COLORS.danger,
-    alignSelf: "flex-start",
-    marginLeft: 5,
-    marginBottom: 10,
-  },
-});
 
 export default ProposalScreen;

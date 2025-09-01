@@ -1,5 +1,3 @@
-// src/contexts/AuthContext.tsx
-
 import React, {
   createContext,
   useContext,
@@ -9,16 +7,18 @@ import React, {
 } from "react";
 import { onAuthStateChanged, User } from "firebase/auth";
 import { auth } from "../api/firebaseConfig";
+import { getUserProfile } from "../api/firestore";
+import { login, signOut as firebaseSignOut } from "../api/auth"; // 1. Importa as funções de login/logout
+import { UserProfile } from "../types";
 
-import { getUserProfile } from "../api/firestore"; // A FUNÇÃO vem da API
-import { UserProfile } from "../types"; // O TIPO vem do novo arquivo
-
-// 1. Adicione a função à interface
+// 2. Adiciona as novas funções à interface do contexto
 export interface AuthContextType {
   user: User | null;
   userProfile: UserProfile | null;
   loading: boolean;
   refetchUserProfile: () => Promise<void>;
+  signIn: (email: string, pass: string) => Promise<void>;
+  signOut: () => Promise<void>;
 }
 
 export const AuthContext = createContext<AuthContextType | undefined>(
@@ -44,17 +44,33 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return () => unsubscribe();
   }, []);
 
-  // 2. Implemente a função
+  // 3. Implementa as funções de autenticação
+  const signIn = async (email: string, pass: string) => {
+    await login(email, pass);
+    // O onAuthStateChanged cuidará de atualizar os estados user e userProfile
+  };
+
+  const signOut = async () => {
+    await firebaseSignOut();
+    // O onAuthStateChanged cuidará de limpar os estados
+  };
+
   const refetchUserProfile = async () => {
     if (user) {
-      // Força uma nova busca do perfil no Firestore
       const profile = await getUserProfile(user.uid);
       setUserProfile(profile as UserProfile | null);
     }
   };
 
-  // 3. Forneça a função no valor do contexto
-  const value = { user, userProfile, loading, refetchUserProfile };
+  // 4. Fornece as novas funções no valor do contexto
+  const value = {
+    user,
+    userProfile,
+    loading,
+    refetchUserProfile,
+    signIn,
+    signOut,
+  };
 
   return (
     <AuthContext.Provider value={value}>

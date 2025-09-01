@@ -5,37 +5,33 @@ import {
   FlatList,
   ActivityIndicator,
   StyleSheet,
-  Alert,
-  Modal,
-  TextInput,
-  TouchableOpacity,
 } from "react-native";
-// import { useAuth } from '../../hooks/useAuth.ts';
+import { useNavigation } from "@react-navigation/native";
+import { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { useAuth } from "../../contexts/AuthContext";
 import {
   getReceivedProposals,
   updateProposalStatus,
   acceptProposal,
   completeProposal,
   getUsersByIds,
-} from "../api/firestore.ts";
+} from "../../api/firestore";
+import Toast from "react-native-toast-message";
+import CompletionModal from "../../components/specific/CompletionModal";
+import { getFirebaseErrorMessage } from "../../utils/errorUtils";
+import { COLORS, FONT_SIZES } from "../../constants";
+import AppButton from "../../components/common/AppButton";
+import { RootStackParamList, Proposal } from "../../types";
 
-import CompletionModal from "../components/specific/CompletionModal.tsx";
-import { getFirebaseErrorMessage } from "../utils/errorUtils";
-import { NativeStackScreenProps } from "@react-navigation/native-stack";
-import { COLORS, FONT_SIZES } from "../constants";
-import AppButton from "../components/common/AppButton.tsx";
-import { RootStackParamList, Proposal, UserProfile } from "../types";
-import { FirebaseError } from "firebase/app";
-import { useAuth } from "../contexts/AuthContext.tsx";
-
-type ReceivedProposalsScreenProps = NativeStackScreenProps<
+// Define o tipo para a prop de navegação desta tela
+type ReceivedProposalsNavigationProp = NativeStackNavigationProp<
   RootStackParamList,
   "ProposalsMain"
 >;
 
-const ReceivedProposalsScreen = ({
-  navigation,
-}: ReceivedProposalsScreenProps) => {
+const ReceivedProposalsScreen = () => {
+  // Usa o tipo que criamos com o hook useNavigation
+  const navigation = useNavigation<ReceivedProposalsNavigationProp>();
   const { user } = useAuth();
   const [proposals, setProposals] = useState<Proposal[]>([]);
   const [loading, setLoading] = useState(true);
@@ -48,10 +44,10 @@ const ReceivedProposalsScreen = ({
       return;
     }
 
-    setLoading(true);
     const unsubscribe = getReceivedProposals(
       user.uid,
       async (receivedProposals) => {
+        setLoading(true);
         try {
           if (receivedProposals.length > 0) {
             const senderIds = [
@@ -61,30 +57,28 @@ const ReceivedProposalsScreen = ({
 
             const enrichedProposals = receivedProposals.map((proposal) => ({
               ...proposal,
-              senderEmail:
-                usersMap.get(proposal.senderId)?.email ||
-                "E-mail não encontrado",
+              senderProfile: usersMap.get(proposal.senderId),
             }));
             setProposals(enrichedProposals);
           } else {
             setProposals([]);
           }
         } catch (error) {
-          console.error("Error enriching received proposals:", error);
-          Alert.alert(
-            "Erro",
-            "Não foi possível carregar detalhes das propostas."
-          );
+          Toast.show({
+            type: "error",
+            text1: "Erro",
+            text2: "Não foi possível carregar os detalhes das propostas.",
+          });
         } finally {
           setLoading(false);
         }
       },
       (error) => {
-        console.error("Error listening to received proposals in UI:", error);
-        Alert.alert(
-          "Erro",
-          "Não foi possível carregar as propostas recebidas em tempo real."
-        );
+        Toast.show({
+          type: "error",
+          text1: "Erro de Conexão",
+          text2: "Não foi possível carregar as propostas.",
+        });
         setLoading(false);
       }
     );
@@ -92,32 +86,33 @@ const ReceivedProposalsScreen = ({
     return () => unsubscribe();
   }, [user]);
 
-  const handleAcceptProposal = async (proposalId: string) => {
-    if (!user) return;
+  const handleAcceptProposal = async (proposal: Proposal) => {
     try {
-      await acceptProposal(proposalId, user.uid);
+      await acceptProposal(proposal);
       Toast.show({
         type: "success",
-        text1: "Sucesso!",
-        text2: "Proposta aceita e chat criado!",
+        text1: "Proposta Aceita!",
+        text2: "O chat já está disponível.",
       });
-    } catch (error: unknown) {
-      const errorMessage = getFirebaseErrorMessage(error);
-      Alert.alert("Erro", errorMessage);
+    } catch (error) {
+      Toast.show({
+        type: "error",
+        text1: "Erro",
+        text2: getFirebaseErrorMessage(error),
+      });
     }
   };
 
   const handleRejectProposal = async (proposalId: string) => {
     try {
       await updateProposalStatus(proposalId, "rejected");
+      Toast.show({ type: "info", text1: "Proposta Rejeitada." });
+    } catch (error) {
       Toast.show({
-        type: "success",
-        text1: "Sucesso!",
-        text2: "Proposta rejeitada.",
+        type: "error",
+        text1: "Erro",
+        text2: getFirebaseErrorMessage(error),
       });
-    } catch (error: unknown) {
-      const errorMessage = getFirebaseErrorMessage(error);
-      Alert.alert("Erro", errorMessage);
     }
   };
 
@@ -135,11 +130,18 @@ const ReceivedProposalsScreen = ({
     setLoading(true);
     try {
       await completeProposal(proposalId, studentId, teacherId, hours);
-      Alert.alert("Sucesso", "Proposta concluída e horas transferidas!");
+      Toast.show({
+        type: "success",
+        text1: "Sucesso!",
+        text2: "Proposta concluída e horas transferidas!",
+      });
       setModalVisible(false);
-    } catch (error: unknown) {
-      const errorMessage = getFirebaseErrorMessage(error);
-      Alert.alert("Erro ao Concluir", errorMessage);
+    } catch (error) {
+      Toast.show({
+        type: "error",
+        text1: "Erro ao Concluir",
+        text2: getFirebaseErrorMessage(error),
+      });
     } finally {
       setLoading(false);
     }
@@ -152,7 +154,7 @@ const ReceivedProposalsScreen = ({
     navigation.navigate("Chat", { chatId: proposal.id, otherUserId });
   };
 
-  if (loading && !isModalVisible) {
+  if (loading) {
     return (
       <View style={styles.centered}>
         <ActivityIndicator size="large" color={COLORS.primary} />
@@ -164,16 +166,19 @@ const ReceivedProposalsScreen = ({
     <View style={styles.container}>
       {proposals.length === 0 ? (
         <View style={styles.centered}>
-          <Text>Nenhuma proposta recebida.</Text>
+          <Text>Nenhuma proposta recebida no momento.</Text>
         </View>
       ) : (
         <FlatList
           data={proposals}
           keyExtractor={(item) => item.id}
-          renderItem={({ item }: { item: Proposal }) => (
+          renderItem={({ item }) => (
             <View style={styles.proposalItem}>
               <Text style={styles.proposalText}>
-                De: {item.senderEmail || "Usuário desconhecido"}
+                De:{" "}
+                {item.senderProfile?.name ||
+                  item.senderProfile?.email ||
+                  "Usuário desconhecido"}
               </Text>
               <Text style={styles.proposalText}>
                 Oferecendo: {item.skillOffered}
@@ -182,11 +187,12 @@ const ReceivedProposalsScreen = ({
                 Solicitando: {item.skillRequested}
               </Text>
               <Text style={styles.proposalText}>Status: {item.status}</Text>
+
               {item.status === "pending" && (
                 <View style={styles.buttonContainer}>
                   <AppButton
                     title="Aceitar"
-                    onPress={() => handleAcceptProposal(item.id)}
+                    onPress={() => handleAcceptProposal(item)}
                     variant="secondary"
                     style={styles.flexButton}
                   />
@@ -219,14 +225,16 @@ const ReceivedProposalsScreen = ({
         />
       )}
 
-      <CompletionModal
-        isVisible={isModalVisible}
-        onClose={() => setModalVisible(false)}
-        onConfirm={handleConfirmCompletion}
-        currentProposal={currentProposal}
-        loading={loading} // Pass loading state from parent
-        currentUserUid={user?.uid || ""}
-      />
+      {currentProposal && (
+        <CompletionModal
+          isVisible={isModalVisible}
+          onClose={() => setModalVisible(false)}
+          onConfirm={handleConfirmCompletion}
+          currentProposal={currentProposal}
+          loading={loading}
+          currentUserUid={user?.uid || ""}
+        />
+      )}
     </View>
   );
 };
@@ -241,6 +249,10 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
     borderRadius: 8,
     elevation: 3,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.22,
+    shadowRadius: 2.22,
   },
   proposalText: {
     fontSize: FONT_SIZES.body,
