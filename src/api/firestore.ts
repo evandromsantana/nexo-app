@@ -15,10 +15,14 @@ import {
   addDoc,
   getDocs,
   writeBatch,
+  limit,
+  startAfter,
 } from 'firebase/firestore';
 import { db } from './firebaseConfig'; // Sua configuração do Firestore
 
+
 // Importa todos os tipos necessários do arquivo central
+import { IMessage } from 'react-native-gifted-chat';
 import { 
   UserProfile, 
   Message, 
@@ -89,6 +93,65 @@ export const getUsersByIds = async (uids: string[]): Promise<Map<string, UserPro
   return usersMap;
 };
 
+/**
+ * Busca usuários pelo nome, excluindo o usuário atual.
+ */
+export const searchUsers = async (searchText: string, currentUserId: string): Promise<{ nameMatches: UserProfile[], skillMatches: UserProfile[] }> => {
+  if (!searchText.trim()) {
+    return { nameMatches: [], skillMatches: [] };
+  }
+
+  const usersRef = collection(db, 'users');
+  const lowercasedSearchText = searchText.toLowerCase();
+
+  // Search by name
+  const nameQuery = query(
+    usersRef,
+    where('name_lowercase', '>=', lowercasedSearchText),
+    where('name_lowercase', '<=', lowercasedSearchText + '\uf8ff')
+  );
+
+  // Search by skills
+  const skillQuery = query(
+    usersRef,
+    where('skills', 'array-contains', lowercasedSearchText)
+  );
+
+  const [nameSnapshot, skillSnapshot] = await Promise.all([
+    getDocs(nameQuery),
+    getDocs(skillQuery)
+  ]);
+
+  const nameMatches = nameSnapshot.docs
+    .map(doc => ({ id: doc.id, ...doc.data() } as UserProfile))
+    .filter(user => user.id !== currentUserId);
+
+  const skillMatches = skillSnapshot.docs
+    .map(doc => ({ id: doc.id, ...doc.data() } as UserProfile))
+    .filter(user => user.id !== currentUserId);
+
+  return { nameMatches, skillMatches };
+};
+
+/**
+ * Busca usuários sugeridos de forma paginada.
+ */
+export const getSuggestedUsers = async (startAfterDoc: any, pageSize: number): Promise<{ users: UserProfile[], lastVisible: any }> => {
+  const usersRef = collection(db, 'users');
+  let q = query(usersRef, orderBy('createdAt', 'desc'), limit(pageSize));
+
+  if (startAfterDoc) {
+    q = query(usersRef, orderBy('createdAt', 'desc'), startAfter(startAfterDoc), limit(pageSize));
+  }
+
+  const querySnapshot = await getDocs(q);
+
+  const users = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as UserProfile));
+  const lastVisible = querySnapshot.docs[querySnapshot.docs.length - 1];
+
+  return { users, lastVisible };
+};
+
 // =================================================================
 // --- Funções de Badges ---
 // =================================================================
@@ -119,6 +182,30 @@ export const getBadgeDetails = async (badgeId: string): Promise<Badge | null> =>
 // =================================================================
 // --- Funções de Chat ---
 // =================================================================
+
+/**
+ * Ouve em tempo real as conversas de um usuário.
+ */
+export const listenForUserChats = (
+  userId: string,
+  callback: (chats: Chat[]) => void,
+  onError: (error: Error) => void
+) => {
+  const chatsRef = collection(db, 'chats');
+  const q = query(
+    chatsRef,
+    where('participants', 'array-contains', userId),
+    orderBy('updatedAt', 'desc')
+  );
+
+  return onSnapshot(q, (snapshot) => {
+    const chats = snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data(),
+    })) as Chat[];
+    callback(chats);
+  }, onError);
+};
 
 /**
  * Cria uma sala de chat entre dois usuários se ela não existir.
@@ -174,22 +261,30 @@ export const sendMessage = async (chatId: string, senderId: string, text: string
 /**
  * Ouve em tempo real as mensagens de um chat.
  */
-export const getMessages = (
+export const listenForChatMessages = (
   chatId: string,
-  callback: (messages: Message[]) => void,
+  callback: (messages: IMessage[]) => void,
   onError: (error: Error) => void
 ) => {
   const messagesRef = collection(db, 'chats', chatId, 'messages');
   const q = query(messagesRef, orderBy('createdAt', 'desc'));
 
   return onSnapshot(q, (snapshot) => {
-    const messages = snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data(),
-    })) as Message[];
+    const messages = snapshot.docs.map(doc => {
+      const data = doc.data();
+      return {
+        _id: doc.id,
+        text: data.text,
+        createdAt: (data.createdAt as Timestamp).toDate(),
+        user: {
+          _id: data.senderId,
+        },
+      };
+    }) as IMessage[];
     callback(messages);
   }, onError);
 };
+  
 
 // =================================================================
 // --- Funções de Ponto de Encontro ---
@@ -279,6 +374,33 @@ export const getReceivedProposals = (
 };
 
 /**
+ * Ouve em tempo real as propostas enviadas por um usuário.
+ */
+export const getSentProposals = (
+  userId: string,
+  callback: (proposals: Proposal[]) => void,
+  onError: (error: Error) => void
+) => {
+  const proposalsRef = collection(db, 'proposals');
+  const q = query(proposalsRef, where('senderId', '==', userId));
+
+  return onSnapshot(q, async (snapshot) => {
+    const proposals = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Proposal[];
+
+    // Enrich proposals with receiver profile information
+    const receiverIds = [...new Set(proposals.map(p => p.receiverId))];
+    if (receiverIds.length > 0) {
+      const receiversMap = await getUsersByIds(receiverIds);
+      proposals.forEach(proposal => {
+        proposal.receiverProfile = receiversMap.get(proposal.receiverId);
+      });
+    }
+
+    callback(proposals);
+  }, onError);
+};
+
+/**
  * Atualiza o status de uma proposta.
  */
 export const updateProposalStatus = async (proposalId: string, status: Proposal['status']): Promise<void> => {
@@ -342,6 +464,28 @@ export const completeProposal = async (
 // =================================================================
 // --- Funções de Avaliações (Reviews) ---
 // =================================================================
+
+/**
+ * Busca todas as avaliações para um usuário específico.
+ */
+export const getReviewsForUser = async (userId: string): Promise<Review[]> => {
+  const reviewsRef = collection(db, 'reviews');
+  const q = query(reviewsRef, where('revieweeId', '==', userId), orderBy('createdAt', 'desc'));
+  const querySnapshot = await getDocs(q);
+  
+  const reviews = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Review));
+  
+  // Para cada avaliação, buscar o perfil de quem a fez
+  const reviewerIds = [...new Set(reviews.map(r => r.reviewerId))];
+  if (reviewerIds.length > 0) {
+    const reviewersMap = await getUsersByIds(reviewerIds);
+    reviews.forEach(review => {
+      review.reviewerProfile = reviewersMap.get(review.reviewerId);
+    });
+  }
+
+  return reviews;
+};
 
 /**
  * Cria uma nova avaliação no Firestore.

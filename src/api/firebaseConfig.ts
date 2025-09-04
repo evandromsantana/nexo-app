@@ -1,24 +1,27 @@
-// src/api/firebaseConfig.ts
-
 import { initializeApp } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
-import { getAuth } from 'firebase/auth'; // Importa a função de autenticação
+import { getAuth } from 'firebase/auth';
 import {
   EXPO_PUBLIC_API_KEY,
-  // ... outras variáveis de ambiente
+  EXPO_PUBLIC_AUTH_DOMAIN,
+  EXPO_PUBLIC_PROJECT_ID,
+  EXPO_PUBLIC_STORAGE_BUCKET,
+  EXPO_PUBLIC_MESSAGING_SENDER_ID,
+  EXPO_PUBLIC_APP_ID,
 } from '@env';
 
-// Sua configuração do Firebase
 const firebaseConfig = {
   apiKey: EXPO_PUBLIC_API_KEY,
-  // ... resto da sua configuração
+  authDomain: EXPO_PUBLIC_AUTH_DOMAIN,
+  projectId: EXPO_PUBLIC_PROJECT_ID,
+  storageBucket: EXPO_PUBLIC_STORAGE_BUCKET,
+  messagingSenderId: EXPO_PUBLIC_MESSAGING_SENDER_ID,
+  appId: EXPO_PUBLIC_APP_ID,
 };
 
-// Initialize Firebase
 const app = initializeApp(firebaseConfig);
 
-// Inicializa e exporta os serviços que você precisa
 const db = getFirestore(app);
-const auth = getAuth(app); // Cria a instância de autenticação
+const auth = getAuth(app);
 
-export { db, auth }; // Exporta ambos
+export { db, auth };

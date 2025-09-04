@@ -98,11 +98,11 @@ const HomeScreen = ({ navigation }: HomeScreenProps) => {
   }, []);
 
   const handleSearch = useCallback(async () => {
-    if (searchText.trim().length <= 2) return;
+    if (searchText.trim().length <= 2 || !userProfile) return;
     setLoading(true);
     setHasSearched(true);
     try {
-      const { nameMatches, skillMatches } = await searchUsers(searchText);
+      const { nameMatches, skillMatches } = await searchUsers(searchText, userProfile.id);
       const newSections = [];
       if (skillMatches.length > 0) {
         newSections.push({
@@ -124,7 +124,7 @@ const HomeScreen = ({ navigation }: HomeScreenProps) => {
     } finally {
       setLoading(false);
     }
-  }, [searchText]);
+  }, [searchText, userProfile]);
 
   const clearSearch = useCallback(() => {
     setSearchText("");

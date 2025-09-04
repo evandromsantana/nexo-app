@@ -3,7 +3,7 @@ import { View, Text, ActivityIndicator, Alert, StyleSheet } from "react-native";
 import {
   getUserProfile,
   getReviewsForUser,
-  getUsersByIds,
+  
   getEarnedBadges,
   getBadgeDetails,
 } from "../api/firestore.ts";
@@ -54,17 +54,7 @@ const UserProfileDetailScreen = ({
             0
           );
           calculatedAverageRating = totalRating / rawReviews.length;
-
-          const reviewerIds = [...new Set(rawReviews.map((r) => r.reviewerId))];
-          const reviewersMap = await getUsersByIds(reviewerIds);
-
-          const enrichedReviews = rawReviews.map((review) => ({
-            ...review,
-            reviewerEmail:
-              reviewersMap.get(review.reviewerId)?.email ||
-              "Usuário desconhecido",
-          }));
-          setReviews(enrichedReviews);
+          setReviews(rawReviews);
         } else {
           setReviews([]);
         }

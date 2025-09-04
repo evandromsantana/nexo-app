@@ -52,6 +52,7 @@ export interface Review {
 export interface Chat {
   id: string;
   participants: string[];
+  participantInfo: UserInfo[];
   createdAt: Timestamp;
   lastMessage?: {
     text: string;
@@ -116,8 +117,10 @@ export type RootStackParamList = {
   EditProfile: { profile: UserProfile };
   Review: { proposalId: string; revieweeId: string };
   Chat: { chatId: string; otherUserId: string };
+  ChatDetail: { chatId: string, recipientName: string, recipientAvatar?: string };
   Notifications: undefined;
   About: undefined;
+  MainTabs: undefined;
 };
 
 export interface UserInfo {

@@ -1,9 +1,16 @@
-import React from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Image } from 'react-native';
-import { UserProfile, Review, Badge } from '../../types';
-import { COLORS, FONT_SIZES } from '../../constants';
-import AppButton from '../common/AppButton';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import React from "react";
+import {
+  View,
+  Text,
+  StyleSheet,
+  FlatList,
+  TouchableOpacity,
+  Image,
+} from "react-native";
+import { UserProfile, Review, Badge } from "../../types";
+import { COLORS, FONT_SIZES } from "../../constants";
+import AppButton from "../common/AppButton";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 
 interface UserProfileDisplayProps {
   userProfile: UserProfile;
@@ -15,18 +22,21 @@ interface UserProfileDisplayProps {
   onProposeTradePress?: (receiverId: string, receiverEmail: string) => void;
 }
 
-const ProfileHeader: React.FC<Omit<UserProfileDisplayProps, 'isCurrentUser' | 'onEditProfilePress' | 'onProposeTradePress'>> = ({
-  userProfile,
-  reviews,
-  earnedBadges,
-  averageRating,
-}) => (
+const ProfileHeader: React.FC<
+  Omit<
+    UserProfileDisplayProps,
+    "isCurrentUser" | "onEditProfilePress" | "onProposeTradePress"
+  >
+> = ({ userProfile, reviews, earnedBadges, averageRating }) => (
   <View>
     <View style={styles.profileDetails}>
       <Text style={styles.profileTitle}>Detalhes do Perfil</Text>
       <View style={styles.avatarContainer}>
         {userProfile.avatarUrl ? (
-          <Image source={{ uri: userProfile.avatarUrl }} style={styles.avatar} />
+          <Image
+            source={{ uri: userProfile.avatarUrl }}
+            style={styles.avatar}
+          />
         ) : (
           <View style={styles.avatarPlaceholder}>
             <Text style={styles.avatarPlaceholderText}>Sem Foto</Text>
@@ -34,9 +44,15 @@ const ProfileHeader: React.FC<Omit<UserProfileDisplayProps, 'isCurrentUser' | 'o
         )}
       </View>
       <Text style={styles.detailText}>Email: {userProfile.email}</Text>
-      {userProfile.name && <Text style={styles.detailText}>Nome: {userProfile.name}</Text>}
-      {userProfile.bio && <Text style={styles.detailText}>Bio: {userProfile.bio}</Text>}
-      <Text style={styles.detailText}>Saldo de Horas: {userProfile.timeBalance}</Text>
+      {userProfile.name && (
+        <Text style={styles.detailText}>Nome: {userProfile.name}</Text>
+      )}
+      {userProfile.bio && (
+        <Text style={styles.detailText}>Bio: {userProfile.bio}</Text>
+      )}
+      <Text style={styles.detailText}>
+        Saldo de Horas: {userProfile.timeBalance}
+      </Text>
 
       {averageRating !== undefined && averageRating > 0 && (
         <View style={styles.ratingContainer}>
@@ -68,14 +84,20 @@ const ProfileHeader: React.FC<Omit<UserProfileDisplayProps, 'isCurrentUser' | 'o
           showsHorizontalScrollIndicator={false}
           renderItem={({ item }) => (
             <View style={styles.badgeItem}>
-              <MaterialCommunityIcons name={item.icon} size={30} color={COLORS.primary} />
+              <MaterialCommunityIcons
+                name={item.icon as any}
+                size={30}
+                color={COLORS.primary}
+              />
               <Text style={styles.badgeName}>{item.name}</Text>
               <Text style={styles.badgeDescription}>{item.description}</Text>
             </View>
           )}
         />
       ) : (
-        <Text style={styles.noBadgesText}>Nenhuma medalha conquistada ainda.</Text>
+        <Text style={styles.noBadgesText}>
+          Nenhuma medalha conquistada ainda.
+        </Text>
       )}
     </View>
 
@@ -113,7 +135,9 @@ const UserProfileDisplay: React.FC<UserProfileDisplayProps> = ({
         <View style={styles.reviewItem}>
           <Text style={styles.reviewText}>Nota: {item.rating}/5</Text>
           <Text style={styles.reviewText}>Comentário: {item.comment}</Text>
-          <Text style={styles.reviewReviewer}>Avaliado por: {item.reviewerEmail}</Text>
+          <Text style={styles.reviewReviewer}>
+            Avaliado por: {item.reviewerProfile?.email || item.reviewerId}
+          </Text>
         </View>
       )}
       ListFooterComponent={
@@ -121,14 +145,19 @@ const UserProfileDisplay: React.FC<UserProfileDisplayProps> = ({
           {isCurrentUser ? (
             <AppButton
               title="Editar Perfil"
-              onPress={() => onEditProfilePress && onEditProfilePress(userProfile)}
+              onPress={() =>
+                onEditProfilePress && onEditProfilePress(userProfile)
+              }
               variant="primary"
               style={styles.editButton}
             />
           ) : (
             <AppButton
               title="Propor Troca"
-              onPress={() => onProposeTradePress && onProposeTradePress(userProfile.id, userProfile.email)}
+              onPress={() =>
+                onProposeTradePress &&
+                onProposeTradePress(userProfile.id, userProfile.email)
+              }
               variant="primary"
             />
           )}
@@ -144,7 +173,7 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
   },
   profileDetails: {
-    width: '100%',
+    width: "100%",
     backgroundColor: COLORS.white,
     borderRadius: 10,
     padding: 15,
@@ -156,21 +185,21 @@ const styles = StyleSheet.create({
     height: 100,
     borderRadius: 50,
     backgroundColor: COLORS.lightGray,
-    justifyContent: 'center',
-    alignItems: 'center',
-    alignSelf: 'center',
+    justifyContent: "center",
+    alignItems: "center",
+    alignSelf: "center",
     marginBottom: 15,
-    overflow: 'hidden',
+    overflow: "hidden",
   },
   avatar: {
-    width: '100%',
-    height: '100%',
+    width: "100%",
+    height: "100%",
   },
   avatarPlaceholder: {
-    width: '100%',
-    height: '100%',
-    justifyContent: 'center',
-    alignItems: 'center',
+    width: "100%",
+    height: "100%",
+    justifyContent: "center",
+    alignItems: "center",
   },
   avatarPlaceholderText: {
     color: COLORS.textMedium,
@@ -189,7 +218,7 @@ const styles = StyleSheet.create({
   },
   skillsTitle: {
     fontSize: FONT_SIZES.body,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     color: COLORS.textDark,
     marginBottom: 5,
   },
@@ -209,39 +238,39 @@ const styles = StyleSheet.create({
   },
   badgesTitle: {
     fontSize: FONT_SIZES.body,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     color: COLORS.textDark,
     marginBottom: 10,
   },
   badgeItem: {
-    backgroundColor: COLORS.secondary + '1A',
+    backgroundColor: COLORS.secondary + "1A",
     padding: 10,
     borderRadius: 10,
     marginRight: 10,
-    alignItems: 'center',
+    alignItems: "center",
     width: 120,
     height: 120,
-    justifyContent: 'center',
+    justifyContent: "center",
     elevation: 1,
   },
   badgeName: {
     fontSize: FONT_SIZES.caption,
-    fontWeight: 'bold',
-    textAlign: 'center',
+    fontWeight: "bold",
+    textAlign: "center",
     color: COLORS.textDark,
   },
   badgeDescription: {
     fontSize: FONT_SIZES.caption,
-    textAlign: 'center',
+    textAlign: "center",
     color: COLORS.textMedium,
   },
   noBadgesText: {
     fontSize: FONT_SIZES.body,
     color: COLORS.textMedium,
-    textAlign: 'center',
+    textAlign: "center",
   },
   section: {
-    width: '100%',
+    width: "100%",
     backgroundColor: COLORS.white,
     borderRadius: 10,
     padding: 15,
@@ -250,7 +279,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: FONT_SIZES.h2,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     marginBottom: 10,
     color: COLORS.textDark,
   },
@@ -269,22 +298,22 @@ const styles = StyleSheet.create({
   reviewReviewer: {
     fontSize: FONT_SIZES.caption,
     color: COLORS.textMedium,
-    textAlign: 'right',
+    textAlign: "right",
   },
   profileTitle: {
     fontSize: FONT_SIZES.h2,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     color: COLORS.textDark,
     marginBottom: 15,
-    textAlign: 'center',
+    textAlign: "center",
   },
   skillsListWrapper: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: "row",
+    flexWrap: "wrap",
     marginTop: 5,
   },
   skillChip: {
-    backgroundColor: COLORS.secondaryLight,
+    backgroundColor: COLORS.secondary,
     borderRadius: 15,
     paddingVertical: 5,
     paddingHorizontal: 10,
@@ -292,8 +321,8 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   ratingContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginTop: 5,
     marginBottom: 10,
   },
@@ -301,12 +330,12 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZES.body,
     color: COLORS.textDark,
     marginLeft: 5,
-    fontWeight: 'bold',
+    fontWeight: "bold",
   },
   footer: {
     paddingHorizontal: 15,
     paddingTop: 10,
-  }
+  },
 });
 
 export default UserProfileDisplay;

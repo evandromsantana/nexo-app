@@ -1,6 +1,6 @@
-import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
-import { COLORS, FONT_SIZES } from '../../constants';
+import React from "react";
+import { View, Text, StyleSheet } from "react-native";
+import { COLORS, FONT_SIZES } from "../constants";
 
 const NotificationsScreen = () => {
   return (
@@ -15,21 +15,21 @@ const NotificationsScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     backgroundColor: COLORS.background,
     padding: 20,
   },
   title: {
     fontSize: FONT_SIZES.h1,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     color: COLORS.textDark,
     marginBottom: 10,
   },
   subtitle: {
     fontSize: FONT_SIZES.body,
     color: COLORS.textMedium,
-    textAlign: 'center',
+    textAlign: "center",
   },
 });
 

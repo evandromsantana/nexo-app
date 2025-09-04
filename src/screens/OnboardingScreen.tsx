@@ -14,7 +14,8 @@ import { getUserProfile, updateUserProfile } from "../api/firestore";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { COLORS, FONT_SIZES } from "../constants";
 import AppButton from "../components/common/AppButton";
-import { RootStackParamList, UserProfile } from "../types";
+import { RootStackParamList, UserProfile, OnboardingProfile } from "../types";
+import Toast from "react-native-toast-message";
 import { getFirebaseErrorMessage } from "../utils/errorUtils";
 
 type OnboardingScreenProps = NativeStackScreenProps<

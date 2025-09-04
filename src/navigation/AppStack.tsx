@@ -1,11 +1,13 @@
 import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { UserProfile } from '../types'; // Import UserProfile type
+import { RootStackParamList, UserProfile } from '../types';
 
 import MainTabNavigator from './MainTabNavigator';
 import OnboardingScreen from '../screens/OnboardingScreen';
 
-const App = createNativeStackNavigator();
+const App = createNativeStackNavigator<RootStackParamList>();
+
+
 
 interface AppStackProps {
   userProfile: UserProfile | null;

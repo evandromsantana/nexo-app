@@ -16,7 +16,7 @@ const MainTabNavigator = () => {
       screenOptions={({ route }) => ({
         headerShown: false,
         tabBarIcon: ({ focused, color, size }) => {
-          let iconName;
+          let iconName: React.ComponentProps<typeof MaterialCommunityIcons>['name'] = 'help-circle';
 
           if (route.name === 'Início') {
             iconName = focused ? 'home' : 'home-outline';

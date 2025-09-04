@@ -1,10 +1,9 @@
-import React, { useState, useEffect, useContext, useCallback } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { GiftedChat, IMessage } from "react-native-gifted-chat";
 import { useRoute, useNavigation } from "@react-navigation/native";
 
 import { listenForChatMessages, sendMessage } from "../api/firestore";
-// import { AuthContext } from "../hooks/useAuth"; // Ajuste o caminho
-import { AuthContext } from "../contexts/AuthContext";
+import { useAuth } from "../contexts/AuthContext";
 
 // Tipagem para os parâmetros recebidos da navegação
 type ChatDetailRouteParams = {
@@ -13,7 +12,7 @@ type ChatDetailRouteParams = {
 };
 
 const ChatDetailScreen = () => {
-  const { user } = useContext(AuthContext);
+  const { user } = useAuth();
   const route = useRoute();
   const navigation = useNavigation();
 
@@ -34,6 +33,8 @@ const ChatDetailScreen = () => {
     // Inicia o listener e guarda a função de unsubscribe
     const unsubscribe = listenForChatMessages(chatId, (newMessages) => {
       setMessages(newMessages);
+    }, (error) => {
+      console.error(error);
     });
 
     // Função de limpeza para parar de escutar quando a tela for fechada
@@ -49,7 +50,7 @@ const ChatDetailScreen = () => {
 
       if (messageToSend && user) {
         // Chama nossa função da API para salvar a mensagem no Firestore
-        sendMessage(chatId, messageToSend);
+        sendMessage(chatId, user.uid, messageToSend.text);
       }
     },
     [chatId, user]
@@ -67,12 +68,9 @@ const ChatDetailScreen = () => {
       onSend={(messages) => onSend(messages)}
       user={{
         _id: user.uid,
-        name: user.name, // Certifique-se que o nome do usuário está no seu AuthContext
-        avatar: user.avatarUrl, // E o avatar também
       }}
       placeholder="Digite sua mensagem..."
       alwaysShowSend
-      messagesSquareAvatar
     />
   );
 };

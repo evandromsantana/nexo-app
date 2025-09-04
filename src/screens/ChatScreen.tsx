@@ -7,10 +7,12 @@ import {
   IMessage,
   Bubble,
   InputToolbar,
+  InputToolbarProps,
+  ActionsProps,
 } from "react-native-gifted-chat";
 import { useRoute, useNavigation } from "@react-navigation/native";
 import { useAuth } from "../contexts/AuthContext";
-import { getMessages, sendMessage, getUserProfile } from "../api/firestore";
+import { listenForChatMessages, sendMessage, getUserProfile } from "../api/firestore";
 import { Message, UserProfile } from "../types";
 import { COLORS } from "../constants";
 import { Timestamp } from "firebase/firestore";
@@ -41,21 +43,12 @@ const ChatScreen = () => {
     });
 
     // Ouve as mensagens em tempo real
-    const unsubscribe = getMessages(
+    const unsubscribe = listenForChatMessages(
       chatId,
-      (firebaseMessages: Message[]) => {
-        const formattedMessages = firebaseMessages.map((msg) => ({
-          _id: msg.id,
-          text: msg.text,
-          createdAt: (msg.createdAt as Timestamp).toDate(),
-          user: {
-            _id: msg.senderId,
-            // Podemos adicionar name e avatar se quisermos mostrar na bolha
-          },
-        }));
-        setMessages(formattedMessages);
+      (messages: IMessage[]) => {
+        setMessages(messages);
       },
-      (error) => {
+      (error: Error) => {
         console.error(error);
       }
     );
@@ -74,7 +67,7 @@ const ChatScreen = () => {
   );
 
   // Função para renderizar a barra de ferramentas customizada
-  const renderInputToolbar = (props) => (
+  const renderInputToolbar = (props: InputToolbarProps<IMessage>) => (
     <InputToolbar
       {...props}
       containerStyle={styles.inputToolbar}
@@ -84,7 +77,7 @@ const ChatScreen = () => {
 
   // Você ainda pode adicionar o botão "Sugerir Encontro"
   // Esta é uma maneira de adicioná-lo, mas existem outras mais elegantes
-  const renderActions = (props) => (
+  const renderActions = (props: ActionsProps) => (
     <AppButton
       title="Sugerir Encontro"
       onPress={() => console.log("Abrir modal de encontro")}

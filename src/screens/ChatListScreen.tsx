@@ -12,9 +12,9 @@ import { useNavigation } from "@react-navigation/native";
 import { formatDistanceToNowStrict } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
-import { listenForUserChats } from "../../api/firestore"; // Ajuste o caminho se necessário
-import { AuthContext } from "../../hooks/useAuth"; // Ajuste o caminho para seu AuthContext
-import { Chat } from "../../types"; // Certifique-se de ter o tipo 'Chat' definido
+import { listenForUserChats } from "../api/firestore"; // Ajuste o caminho se necessário
+import { Chat } from "../types"; // Certifique-se de ter o tipo 'Chat' definido
+import { useAuth } from "../contexts/AuthContext";
 
 // Este é um componente de navegação padrão.
 // Você pode precisar tipá-lo melhor dependendo da sua configuração de navegação.
@@ -23,7 +23,7 @@ type NavigationProps = {
 };
 
 const ChatListScreen = () => {
-  const { user } = useContext(AuthContext); // Pega o usuário do contexto de autenticação
+  const { user } = useAuth(); // Pega o usuário do contexto de autenticação
   const navigation = useNavigation<NavigationProps>();
 
   const [chats, setChats] = useState<Chat[]>([]);
@@ -41,6 +41,9 @@ const ChatListScreen = () => {
       if (loading) {
         setLoading(false);
       }
+    }, (error) => {
+      console.error("Failed to listen for chats:", error);
+      setLoading(false);
     });
 
     // Função de limpeza: será chamada quando o componente for desmontado.
